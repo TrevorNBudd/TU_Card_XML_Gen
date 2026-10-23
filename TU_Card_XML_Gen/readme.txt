@@ -345,9 +345,15 @@ Defaults:
     Fusion level 2                  80% .. 100% of max
     Summoned card (every tier)      50% .. 100% of max
 
-  - Fusion levels are counted up from the base card: fusion level 0 is the card
-    with no fusion recipe, 1 is made from it, and so on. Fusion levels above the
-    last range use the last range.
+  - Each card uses the range for ITS OWN fusion level, read from the top card's
+    <fusion_level> (none = 0) and counting down the chain. So a lone Fusion 2
+    card such as Revenant gets 80..100, and a normal 3-card chain gets 0, 1, 2.
+  - Four-stage commanders (Epic, Legendary, Fusion 1, Fusion 2, e.g. Malika /
+    Malika / Vengeful Malika / Insurgent Malika): the last three stages are
+    scaled and the FIRST STAGE IS LEFT UNCHANGED (the console says so). To scale
+    it too, give four ranges (FusionLevel0..FusionLevel3 in config.xml, or four
+    in // SCALE:): the first is then for that extra lowest stage, and the last
+    three stay fusion levels 0, 1, 2.
   - A "summoned card" is one that comes right after a "---" in the update file,
     or one in set 9500.
   - Results round to the NEAREST whole number (halves round up).
@@ -559,6 +565,11 @@ CHANGES IN 1.8.0
     automatic opening off.
   - The Card XML Viewer is included as CardXmlViewer.html, with the same checks
     and a "Compare with before..." button.
+  - Tiered scaling: each card uses the range for its own fusion level (from the
+    top card's <fusion_level>), so lone Fusion 2 cards (e.g. Revenant) get
+    80..100 instead of 50..60, and Base Fusion pairs (e.g. Stag Beetle ->
+    Forsaken Beetle) get 60..80 / 80..100. Four-stage commanders leave their
+    first stage unchanged unless four ranges are given.
   - Standard folders under the main folder: data (update files), results (one
     folder per run) and logs (one log per day, runs appended). Set in <Folders>.
   - Cleanup: data, results and logs older than <CleanupMonths> (3) months are

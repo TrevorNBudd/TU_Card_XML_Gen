@@ -60,6 +60,28 @@ namespace TU_Card_XML_Gen
         }
 
         /// <summary>
+        /// Which range each stage of a chain uses, lowest stage first.  -1 = no range: leave that stage unchanged.
+        ///
+        /// The top card's own fusion level (its &lt;fusion_level&gt; tag; none = 0) picks its range, and each stage below
+        /// it takes the range below.  With the usual three ranges (fusion levels 0, 1, 2) that is simply the card's
+        /// fusion level, so a lone Fusion 2 card gets 80..100 and a normal chain gets 0, 1, 2.  A chain with more stages
+        /// than ranges (a four-stage commander: Epic, Legendary, Fusion 1, Fusion 2) scales its last stages and leaves
+        /// the first unchanged.  Extra ranges (four or more) are for those extra lower stages: the last three ranges
+        /// stay fusion levels 0, 1, 2.  A single range applies to every stage.
+        /// </summary>
+        public List<int> RangeIndexes(int stages, int topFusionLevel)
+        {
+            int ranges = FusionLevels.Count;
+            if (ranges == 1)
+            {
+                return Enumerable.Repeat(0, stages).ToList();
+            }
+
+            int top = Math.Clamp(ranges - 3 + Math.Clamp(topFusionLevel, 0, 2), 0, ranges - 1);
+            return Enumerable.Range(0, stages).Select(i => top - (stages - 1 - i)).ToList();
+        }
+
+        /// <summary>
         /// Fraction of max (0..1) for one level of one tier.
         /// </summary>
         /// <param name="fusionLevel">0 for the base card, 1 for its first fusion, ...</param>

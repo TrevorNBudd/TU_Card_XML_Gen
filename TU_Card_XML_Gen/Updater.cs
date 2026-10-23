@@ -412,9 +412,32 @@ namespace TUComparatorLibrary
 
                     roundToNearest = tiered != null;
 
+                    // Which tiered range each stage gets (index into tiered.FusionLevels); see TieredScaling.RangeIndexes.
+                    // A stage with no range (the first stage of a four-stage commander when only three ranges are set)
+                    // is left exactly as it is.
+                    List<int> rangeIndex = Enumerable.Repeat(0, cardXMLsToUpdate.Count).ToList();
+                    if (tiered != null && !isSummoned)
+                    {
+                        int.TryParse(cardXMLsToUpdate.Last().Element("fusion_level")?.Value.Trim(), out int topFusionLevel);
+                        rangeIndex = tiered.RangeIndexes(cardXMLsToUpdate.Count, topFusionLevel);
+
+                        for (int s = cardXMLsToUpdate.Count - 1; s >= 0; s--)
+                        {
+                            if (rangeIndex[s] < 0)
+                            {
+                                Console.WriteLine($"  {cardsToUpdate[s].name} [{cardsToUpdate[s].id}] left unchanged: {cardXMLsToUpdate.Count} stages but only {tiered.FusionLevels.Count} tiered ranges. Add a range for it (a fourth FusionLevel in config.xml, or a fourth range in // SCALE:) to scale it too.");
+                                cardXMLsToUpdate.RemoveAt(s);
+                                cardsToUpdate.RemoveAt(s);
+                                rangeIndex.RemoveAt(s);
+                            }
+                        }
+                    }
+
                     Console.WriteLine(tiered == null
                         ? "  Scaling: autostats"
-                        : $"  Scaling: tiered, {(isSummoned ? $"summoned card {tiered.Summoned}" : $"fusion levels {string.Join(", ", tiered.FusionLevels)}")}");
+                        : isSummoned
+                            ? $"  Scaling: tiered, summoned card {tiered.Summoned}"
+                            : "  Scaling: tiered, " + string.Join(", ", cardsToUpdate.Select((c, s) => $"{c.name} {tiered.FusionLevels[rangeIndex[s]]}")));
 
                     for (int i = 0; i < cardXMLsToUpdate.Count; i++)
                     {
@@ -443,8 +466,8 @@ namespace TUComparatorLibrary
 
                         if (tiered != null)
                         {
-                            // i is the fusion level: the chain is ordered from the base card up.
-                            scalingFactor = tiered.Factor(i, isSummoned, 1, upgrades.Count + 1);
+                            // this stage's range (see TieredScaling.RangeIndexes); the chain is ordered from the base card up.
+                            scalingFactor = tiered.Factor(rangeIndex[i], isSummoned, 1, upgrades.Count + 1);
                         }
 
                         // Level 1 is on the card
@@ -501,7 +524,7 @@ namespace TUComparatorLibrary
                             if (tiered != null)
                             {
                                 // upgrade k is level k + 2 (the base card is level 1)
-                                scalingFactor = tiered.Factor(i, isSummoned, k + 2, upgrades.Count + 1);
+                                scalingFactor = tiered.Factor(rangeIndex[i], isSummoned, k + 2, upgrades.Count + 1);
                             }
 
                             // Base card healths and attacks

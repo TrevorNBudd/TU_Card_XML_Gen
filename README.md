@@ -255,7 +255,8 @@ Used when `<Mode>` is `tiered`, or after any SCALE comment other than `DEFAULT`.
 | Fusion level 2 | 80 – 100 |
 | Summoned card (every tier) | 50 – 100 |
 
-- Fusion levels count **up from the base card**: level 0 is the card with no fusion recipe, level 1 is made from it, and so on. Fusion levels above the last range use the last range.
+- Each card uses the range for **its own fusion level**, read from the top card's `<fusion_level>` (none = 0) and counting down the chain. So a lone Fusion 2 card such as Revenant gets 80–100, and a normal three-card chain gets 0, 1, 2.
+- **Four-stage commanders** (Epic, Legendary, Fusion 1, Fusion 2, e.g. Malika / Malika / Vengeful Malika / Insurgent Malika): the last three stages are scaled and the **first stage is left unchanged** (the console says so). To scale it too, give four ranges (`FusionLevel0` .. `FusionLevel3` in `config.xml`, or four in `// SCALE:`): the first is then for that extra lowest stage, and the last three stay fusion levels 0, 1, 2.
 - A **summoned card** is one that comes right after a `---` in the update file, or one in set 9500.
 - Results round to the **nearest** whole number (halves round up).
 
@@ -406,6 +407,7 @@ This works for files changed by any tool, including older versions of this one.
 
 - **Review page**: `review.html` opens after every run with the changed and new cards, their before versions and rule checks. `<OpenReviewPage>` turns the automatic opening off.
 - The Card XML Viewer is included as `CardXmlViewer.html`, with the same checks and a **Compare with before…** button.
+- **Tiered scaling fix**: each card uses the range for its own fusion level (from the top card's `<fusion_level>`), so lone Fusion 2 cards (e.g. Revenant) get 80–100 instead of 50–60, and Base Fusion pairs (e.g. Stag Beetle → Forsaken Beetle) get 60–80 / 80–100. Four-stage commanders leave their first stage unchanged unless four ranges are given.
 - Standard folders under the main folder: `data` (update files), `results` (one folder per run) and `logs` (one log per day, runs appended). Set in `<Folders>`.
 - **Cleanup**: data, results and logs older than `<CleanupMonths>` (3) months are deleted at the start of each run.
 - `config.xml` is found in the current folder or next to the exe; relative paths in it start at its folder. "Press any key" no longer crashes when the input is redirected.

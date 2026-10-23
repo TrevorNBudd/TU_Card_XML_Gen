@@ -44,6 +44,11 @@ namespace TU_Card_XML_Gen
         public static string Resolve(string mainFolder, string? path, string fallback)
         {
             string p = string.IsNullOrWhiteSpace(path) ? fallback : path.Trim();
+            if (Path.DirectorySeparatorChar == '/')
+            {
+                p = p.Replace('\\', '/');   // config.xml is written with Windows paths; let it work elsewhere too
+            }
+
             return Path.GetFullPath(Path.IsPathRooted(p) ? p : Path.Combine(mainFolder, p));
         }
 
