@@ -24,13 +24,33 @@ Current version: **1.8.0**. Requires the .NET 8 runtime.
 
 ## Setup
 
-Edit `config.xml` (it sits next to the exe), then run the exe.
+Edit `config.xml`, then run the exe.
+
+### Folders
+
+The **main folder** is the folder `config.xml` is in (the tool looks in the folder you run it from, then next to the exe). Under it:
+
+```text
+config.xml
+data\       your update files (default update file: data\updatefile.txt)
+results\    one folder per run, named by date and time (results\2026-10-23-11-10-05),
+            with review.html and a copy of every changed or new card
+logs\       everything the tool prints, one file per day (2026-10-23.log);
+            later runs on the same day are added to the end
+```
+
+The folders are made for you. Their names and places are set under `<Folders>`; a relative path there (or in `PathToCardXMLs` and `PathToUpdateFile`) starts at the main folder.
+
+**Cleanup:** at the start of every run, anything directly inside `data`, `results` and `logs` that hasn't changed for `<CleanupMonths>` months (default 3) is **deleted**, and the console and log list what was removed. `0` turns it off. The update file in use and today's log are always kept. A folder that is or holds the game data (`PathToCardXMLs`, or any `cards_section` file), the main folder, or a folder above it is never cleaned.
+
+### Settings
 
 | Setting | Meaning |
 |---|---|
 | `<Operation>` | `standard` applies the update file. `massnerfpoison` multiplies Poison on every card by a factor. |
 | `<PathToCardXMLs>` | Folder holding the game XMLs. It must contain `cards_section_1.xml`, `cards_section_2.xml`, … (numbered from 1 with no gaps), `skills_set.xml` and `fusion_recipes_cj2.xml`. |
-| `<PathToUpdateFile>` | Full path to your update file (standard operation only). |
+| `<PathToUpdateFile>` | Your update file (standard operation only). Default `data\updatefile.txt`; a full path also works. |
+| `<Folders>` | `Data` (`data`), `Results` (`results`), `Logs` (`logs`), `CleanupMonths` (`3`). See [Folders](#folders). |
 | `<AutoStats>` | `PercentAcrossTier` (default 15) and `PercentBetweenTiers` (default 5), used by autostats scaling. See [scaling](#how-scaling-works). |
 | `<Scaling>` | `<Mode>`: `autostats` (default) or `tiered`. `<Tiered>`: `FusionLevel0` (default `50..60`), `FusionLevel1` (`60..80`), `FusionLevel2` (`80..100`), `Summoned` (`50..100`). See [scaling](#how-scaling-works). |
 | `<NewCards>` | `SetId` (default `2500`), `SectionFile` (default `cards_section_21.xml`), `Label` (default: update file name + month). See [New cards](#new-cards). |
@@ -39,7 +59,7 @@ Edit `config.xml` (it sits next to the exe), then run the exe.
 
 > **The card XMLs are changed in place.** The tool overwrites the `cards_section_N.xml` files that contain a changed card, and new cards add to `fusion_recipes_cj2.xml`. If anything goes wrong, reset the XMLs by downloading them again in TUO.
 
-The tool also creates an `output-<date-time>` folder next to the exe with one small XML per updated or new card (`<card name>.xml`), plus `new_cards_recipes.xml` and `new_cards_summary.txt` for new cards. Handy for review and for the update you send to Kongregate.
+Each run's results folder (`results\<date-time>`) holds one small XML per updated or new card (`<card name>.xml`), `review.html`, and for new cards `new_cards_recipes.xml` and `new_cards_summary.txt`. Handy for review and for the update you send to Kongregate.
 
 At the end the console lists any cards that **failed to update** and any **warnings**. Read it, then check the [review page](#review-page) that opens in your browser.
 
@@ -356,7 +376,7 @@ Not supported: mission cards (CardBuilder `-UseMissionSet`), real Commanders and
 
 ## Review page
 
-After every run the tool writes `review.html` into the `output-<date-time>` folder and opens it in your browser (turn that off with `<OpenReviewPage>false</OpenReviewPage>`). It's the Card XML Viewer showing only the cards this run **changed** or **created**, each compared with the same card from before the run.
+After every run the tool writes `review.html` into that run's results folder and opens it in your browser (turn that off with `<OpenReviewPage>false</OpenReviewPage>`). It's the Card XML Viewer showing only the cards this run **changed** or **created**, each compared with the same card from before the run.
 
 A card that breaks a rule gets a ⚠ next to its name, and the cell at fault (a level's HP, a skill, the cost, an id) gets one too. **Hover over a ⚠ to see why.** Amber is worth a look; red is almost certainly wrong.
 
@@ -386,6 +406,9 @@ This works for files changed by any tool, including older versions of this one.
 
 - **Review page**: `review.html` opens after every run with the changed and new cards, their before versions and rule checks. `<OpenReviewPage>` turns the automatic opening off.
 - The Card XML Viewer is included as `CardXmlViewer.html`, with the same checks and a **Compare with before…** button.
+- Standard folders under the main folder: `data` (update files), `results` (one folder per run) and `logs` (one log per day, runs appended). Set in `<Folders>`.
+- **Cleanup**: data, results and logs older than `<CleanupMonths>` (3) months are deleted at the start of each run.
+- `config.xml` is found in the current folder or next to the exe; relative paths in it start at its folder. "Press any key" no longer crashes when the input is redirected.
 
 ## Changes in 1.7.0
 

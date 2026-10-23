@@ -16,7 +16,31 @@ Requires the .NET 8 runtime.
 1. SETUP
 -----------------------------------------------------------------------
 
-Edit config.xml (it sits next to the exe):
+FOLDERS
+The "main folder" is the folder config.xml is in (the tool looks for config.xml
+in the folder you run it from, then next to the exe). Under it:
+
+    config.xml
+    data\      your update files (default update file: data\updatefile.txt)
+    results\   one folder per run, named by date and time (e.g.
+               results\2026-10-23-11-10-05) with review.html and a copy of every
+               changed or new card
+    logs\      everything the tool prints, one file per day (2026-10-23.log);
+               later runs on the same day are added to the end
+
+The folders are made for you. Their names and places are set in config.xml
+under <Folders>; a relative path there (or in PathToCardXMLs and
+PathToUpdateFile) starts at the main folder.
+
+CLEANUP
+At the start of every run, anything directly inside data, results and logs that
+hasn't changed for <CleanupMonths> months (default 3) is DELETED, and the
+console and log list what was removed. 0 = never delete. The update file in
+use and today's log are always kept, and a folder that is, holds or contains
+the game data (PathToCardXMLs or any cards_section file), the main folder, or a
+folder above it, is never cleaned.
+
+Edit config.xml:
 
   <Operation>         standard        - normal run: apply the update file
                       massnerfpoison  - multiply Poison on every card by a factor
@@ -27,7 +51,11 @@ Edit config.xml (it sits next to the exe):
                         skills_set.xml
                         fusion_recipes_cj2.xml
 
-  <PathToUpdateFile>  Full path to your update file (standard operation only).
+  <PathToUpdateFile>  Your update file (standard operation only). Default
+                      data\updatefile.txt; a full path also works.
+
+  <Folders>           <Data> data, <Results> results, <Logs> logs,
+                      <CleanupMonths> 3 (see FOLDERS and CLEANUP above).
 
   <AutoStats>         Percentages for autostats scaling (see section 6).
     <PercentAcrossTier>    default 15
@@ -61,8 +89,8 @@ containing a changed card are rewritten. New cards also add to
 fusion_recipes_cj2.xml. If anything goes wrong, reset the XMLs by downloading them
 again in TUO.
 
-It also creates a folder next to the exe called output-<date-time> containing one
-small XML per updated or new card (<card name>.xml), and for new cards
+Each run's results folder (results\<date-time>) holds one small XML per updated
+or new card (<card name>.xml), review.html, and for new cards
 new_cards_recipes.xml and new_cards_summary.txt. Those are handy for review and
 for pasting into the update you send to Kongregate.
 
@@ -482,7 +510,7 @@ Dominions, and finding pictures (use GetAvailablePictures.ps1).
 10. REVIEW PAGE (review.html)
 -----------------------------------------------------------------------
 
-After every run the tool writes review.html into the output-<date-time> folder
+After every run the tool writes review.html into that run's results folder
 and opens it in your browser (turn that off with <OpenReviewPage>false). It is
 the Card XML Viewer showing only the cards this run CHANGED or CREATED, each
 compared with the same card from before the run.
@@ -531,6 +559,13 @@ CHANGES IN 1.8.0
     automatic opening off.
   - The Card XML Viewer is included as CardXmlViewer.html, with the same checks
     and a "Compare with before..." button.
+  - Standard folders under the main folder: data (update files), results (one
+    folder per run) and logs (one log per day, runs appended). Set in <Folders>.
+  - Cleanup: data, results and logs older than <CleanupMonths> (3) months are
+    deleted at the start of each run.
+  - config.xml is found in the current folder or next to the exe; relative paths
+    in it start at its folder. "Press any key" no longer crashes when the input is
+    redirected.
 
 
 -----------------------------------------------------------------------

@@ -365,4 +365,6 @@ FodyWeavers.xsd
 output*/
 /TU_Card_XML_Gen.code-workspace
 /config.xml
-/updatefile.txt
+/updatefile.txt/data/
+/results/
+/logs/

@@ -9,7 +9,7 @@ namespace TUComparatorLibrary
     public class Updater
     {
 
-        string version = "1.8.0";
+        public const string Version = "1.8.0";
         public static List<XElement> skillData;
         public static List<XElement> factionData;
         public static List<XElement> fusionData;
@@ -87,16 +87,20 @@ namespace TUComparatorLibrary
             "death" //trigger
         };
 
-        private string outputDirectory = $"output-{DateTime.Now.ToString("yyyy-MM-dd-hh-mm-ss")}";
+        /// <summary>This run's folder inside the results folder, e.g. results\2026-10-23-11-10-05.</summary>
+        private string outputDirectory = string.Empty;
 
         private ConfigStore config;
 
         /// <summary>Title for review.html: the update file's name, or the operation.</summary>
         private string reviewTitle = "Update";
 
-        public void Run(string oldXmlDirectory, string updateFilePath, ConfigStore config)
+        public void Run(string oldXmlDirectory, string updateFilePath, ConfigStore config, string resultsFolder)
         {
-            Console.WriteLine($"Running TU_Card_XML_Gen version {version}");
+            outputDirectory = Path.Combine(resultsFolder, DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture));
+
+            Console.WriteLine($"Running TU_Card_XML_Gen version {Version}");
+            Console.WriteLine($"Results for this run: {Path.GetFullPath(outputDirectory)}");
             Console.WriteLine($"Operation: {config.Operation}");
 
             this.oldXmlDirectory = oldXmlDirectory;

@@ -1,16 +1,29 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <root>
 	<Operation>standard</Operation>
-	<!-- After every run, review.html (in the output folder) shows the changed and new cards with rule
+	<!-- After every run, review.html (in that run's results folder) shows the changed and new cards with rule
 	     checks. true = open it in the browser automatically; false = just write it. -->
 	<OpenReviewPage>true</OpenReviewPage>
 	<!-- VALID OPERATIONS: 
 	<Operation>standard</Operation>
 	<Operation>massnerfpoison</Operation>
 	-->
+	<!-- FOLDERS: relative paths here and below start at the "main folder", the folder this config.xml is in.
+	     Data:    your update files (the default update file is data\updatefile.txt).
+	     Results: one folder per run, named by date and time, with review.html and a copy of every card changed.
+	     Logs:    everything the tool prints, one file per day (yyyy-MM-dd.log); runs on the same day are added to it.
+	     CleanupMonths: at the start of each run, anything in these three folders that hasn't changed for this many
+	     months is deleted. 0 = never delete. The update file in use is always kept, and a folder that holds the
+	     game data (PathToCardXMLs, or any cards_section files) is never cleaned. -->
+	<Folders>
+		<Data>data</Data>
+		<Results>results</Results>
+		<Logs>logs</Logs>
+		<CleanupMonths>3</CleanupMonths>
+	</Folders>
 	<PathToCardXMLs>C:\Users\purpl\OneDrive\Documents\TU_Test</PathToCardXMLs>
 	<StandardOperationConfig>
-		<PathToUpdateFile>C:\Users\purpl\OneDrive\Documents\TU_Test\updatefile.txt</PathToUpdateFile>
+		<PathToUpdateFile>data\updatefile.txt</PathToUpdateFile>
 		<AutoStats>
 			<!-- 
 		WHAT THESE MEAN:
