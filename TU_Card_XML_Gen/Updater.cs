@@ -774,7 +774,8 @@ namespace TUComparatorLibrary
 
             Console.WriteLine($"{fileForCardId.Count} cards updated"
                 + (newCards != null ? $" and {newCards.Units.Count} new cards added" : string.Empty)
-                + $" in {cardsUpdated} files.  The following cards failed to update:");
+                + $" in {cardsUpdated} files.  "
+                + (cardsFailedToUpdate.Count == 0 ? "No cards failed." : "The following cards failed to update:"));
 
             foreach (string failedCard in cardsFailedToUpdate)
             {
