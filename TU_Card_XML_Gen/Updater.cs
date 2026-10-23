@@ -2,13 +2,14 @@
 using System.Xml.XPath;
 using TU_Card_XML_Gen;
 using TU_Card_XML_Gen.NewCards;
+using TU_Card_XML_Gen.Review;
 
 namespace TUComparatorLibrary
 {
     public class Updater
     {
 
-        string version = "1.7.0";
+        string version = "1.8.0";
         public static List<XElement> skillData;
         public static List<XElement> factionData;
         public static List<XElement> fusionData;
@@ -90,12 +91,18 @@ namespace TUComparatorLibrary
 
         private ConfigStore config;
 
+        /// <summary>Title for review.html: the update file's name, or the operation.</summary>
+        private string reviewTitle = "Update";
+
         public void Run(string oldXmlDirectory, string updateFilePath, ConfigStore config)
         {
             Console.WriteLine($"Running TU_Card_XML_Gen version {version}");
             Console.WriteLine($"Operation: {config.Operation}");
 
             this.oldXmlDirectory = oldXmlDirectory;
+            reviewTitle = config.Operation == ConfigStore.UpdaterOperation.Standard
+                ? Path.GetFileNameWithoutExtension(updateFilePath)
+                : config.Operation.ToString();
 
             Initialize(config);
 
@@ -662,6 +669,7 @@ namespace TUComparatorLibrary
         private void SaveCards(List<string> cardsFailedToUpdate, Dictionary<int, XElement> newXmls, Dictionary<int, int> fileForCardId, List<string>? warnings = null, NewCardsOutcome? newCards = null)
         {
             int cardsUpdated = 0;
+            List<(XElement After, XElement? Before)> reviewCards = new List<(XElement, XElement?)>();
 
             // we have a list of all the cards to update, and the files they're in.
             // for each file, check for updates, and if there are some, do them and then write to file.
@@ -694,8 +702,12 @@ namespace TUComparatorLibrary
                             XElement newXml = newXmls[cardId];
                             string cardName = newXml.XPathSelectElement("name")?.Value.ToString();
 
+                            // keep the card as it was, for the review page (buffs work on copies, so this is the original)
+                            XElement? beforeXml = oldCardXmls[i].XPathSelectElement($@"//unit[id='{cardId}']");
+                            reviewCards.Add((newXml, beforeXml == null || ReferenceEquals(beforeXml, newXml) ? null : new XElement(beforeXml)));
+
                             //add the new node
-                            oldCardXmls[i].XPathSelectElement($@"//unit[id='{cardId}']")?.ReplaceWith(newXml);
+                            beforeXml?.ReplaceWith(newXml);
 
                             // Write to new file in the folder.
                             File.WriteAllText($"{outputDirectory}//{cardName}.xml", newXml.ToString());
@@ -734,6 +746,35 @@ namespace TUComparatorLibrary
                 {
                     Console.WriteLine($"WARNING: {warning}");
                 }
+            }
+
+            WriteReviewPage(reviewCards, newCards?.Units ?? new List<XElement>());
+        }
+
+        /// <summary>
+        /// review.html in the output folder: the changed and new cards in the Card XML Viewer, with its rule checks
+        /// (skill count, levels in order, values that dip, cost, lost skills ...).  Never fails the run.
+        /// </summary>
+        private void WriteReviewPage(List<(XElement After, XElement? Before)> changed, List<XElement> created)
+        {
+            if (changed.Count == 0 && created.Count == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                string path = ReviewPage.Write(outputDirectory, reviewTitle, changed, created, Updater.fusionData);
+                Console.WriteLine();
+                Console.WriteLine($"Review page (check every card marked with a warning triangle): {path}");
+                if (config.OpenReviewPage)
+                {
+                    ReviewPage.Open(path);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Couldn't write the review page: {ex.Message}");
             }
         }
 

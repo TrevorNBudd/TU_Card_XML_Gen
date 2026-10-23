@@ -96,6 +96,8 @@
 
   .xpath-sub-row {
     display: flex;
+    flex-wrap: wrap;
+    row-gap: 3px;
     align-items: center;
     gap: 14px;
     font-size: 11.5px;
@@ -108,6 +110,7 @@
     gap: 4px;
     cursor: pointer;
     user-select: none;
+    white-space: nowrap;
   }
   .xpath-sub-row input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 
@@ -237,27 +240,6 @@
     white-space: nowrap;
   }
 
-  .warn-badge {
-    background: var(--danger-soft);
-    color: var(--danger);
-    cursor: pointer;
-  }
-  .warn-badge:hover { background: var(--danger); color: #fff; }
-
-  .warn-popup {
-    position: absolute;
-    z-index: 100;
-    background: var(--panel);
-    border: 1px solid var(--danger);
-    border-radius: 6px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
-    padding: 8px 10px;
-    max-width: 360px;
-    font-size: 12px;
-  }
-  .warn-popup ul { margin: 0; padding-left: 16px; }
-  .warn-popup li { margin-bottom: 4px; color: var(--ink); }
-  .warn-popup li:last-child { margin-bottom: 0; }
 
   .close-btn {
     flex: 0 0 auto;
@@ -321,15 +303,77 @@
   .row-id { color: var(--ink-soft); }
 
   ::selection { background: var(--accent-soft); }
+
+  /* ---- rule checks: warning triangles and their tooltips ---- */
+  :root {
+    --warn: #a86a12;
+    --warn-soft: #fbedd3;
+  }
+
+  .issue-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    vertical-align: -2px;
+    color: var(--warn);
+    cursor: help;
+    font-family: var(--sans);
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+  .issue-icon svg { width: 13px; height: 13px; flex: 0 0 auto; }
+  .issue-icon.sev-error { color: var(--danger); }
+  td .issue-icon { margin-right: 3px; }
+
+  .card-issues {
+    padding: 1px 7px 1px 5px;
+    border-radius: 999px;
+    background: var(--warn-soft);
+    margin-right: 4px;
+  }
+  .card-issues.sev-error { background: var(--danger-soft); }
+
+  td.has-warn { background-image: linear-gradient(0deg, rgba(168,106,18,0.14), rgba(168,106,18,0.14)); }
+  td.has-error { background-image: linear-gradient(0deg, rgba(160,62,62,0.17), rgba(160,62,62,0.17)); }
+
+  .tip {
+    position: absolute;
+    z-index: 200;
+    background: var(--panel);
+    border: 1px solid var(--warn);
+    border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+    padding: 7px 10px;
+    max-width: 440px;
+    font-size: 12px;
+    font-family: var(--sans);
+    pointer-events: none;
+  }
+  .tip.sev-error { border-color: var(--danger); }
+  .tip ul { margin: 0; padding: 0; list-style: none; }
+  .tip li { margin: 0 0 5px; display: flex; gap: 6px; align-items: flex-start; line-height: 1.35; white-space: normal; }
+  .tip li:last-child { margin-bottom: 0; }
+  .tip li svg { width: 12px; height: 12px; flex: 0 0 auto; margin-top: 2px; color: var(--warn); }
+  .tip li.sev-error svg { color: var(--danger); }
+
+  .badge-new { background: #dcefdc; color: #2f6b34; }
+  .badge-changed { background: #e3ecf6; color: #2f4f73; }
+
+  .view-filters { display: flex; gap: 14px; align-items: center; }
+  .view-filters label.disabled { opacity: 0.45; cursor: default; }
+  #reviewTitle { font-weight: 700; color: var(--accent-dark); margin: 5px 4px 0 0; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>Card XML Viewer</h1>
+  <span id="reviewTitle"></span>
   <input type="file" id="fileInput" accept=".xml" multiple>
+  <input type="file" id="beforeInput" accept=".xml" multiple style="display:none">
   <div id="toolbarRight">
     <button class="primary" id="openBtn">Open XML File(s)</button>
+    <button id="beforeBtn" title="Load the same file(s) as they were BEFORE the update. Cards are matched by id, so changed cards and lost skills or levels show up.">Compare with before&hellip;</button>
   </div>
 
   <div class="xpath-box">
@@ -345,6 +389,10 @@
     <div class="xpath-sub-row">
       <label><input type="checkbox" id="chkSummon"> Also load summoned cards</label>
       <label><input type="checkbox" id="chkRecipes"> Also load fusion recipe cards</label>
+      <span class="view-filters">
+        <label><input type="checkbox" id="chkWarnOnly"> Only cards with warnings</label>
+        <label id="lblChangedOnly" class="disabled" title="Load a 'before' file first (Compare with before...)"><input type="checkbox" id="chkChangedOnly" disabled> Only changed cards</label>
+      </span>
       <span class="match-info" id="matchInfo">Showing all loaded cards.</span>
     </div>
   </div>
@@ -366,10 +414,13 @@
   <div id="emptyState">
     Open one or more XML files exported by CardBuilder (<b>newCards.xml</b>, <b>recipes.xml</b>,
     or any real <b>cards_section_*.xml</b>) to see cards laid out here.<br>
-    Load a recipes file alongside its cards to see fusion connections drawn between them.
+    Load a recipes file alongside its cards to see fusion connections drawn between them.<br>
+    <b>Compare with before&hellip;</b> loads the same file(s) as they were before an update, to see what changed.<br>
+    A card that breaks a rule gets a &#9888; - hover over it to see why.
   </div>
   <div id="cardsContainer"></div>
 </main>
+<!-- REVIEW-DATA -->
 
 <script>
 (function () {
@@ -385,6 +436,9 @@
   let recipes = [];     // [{cardId, resources:[{cardId, number}], sourceFile}]
   let sourceDocs = [];   // [{doc, fileName}] - kept around so XPath can run against them
   let cardOrder = 0;    // increasing counter, used for base-row color alternation
+  let beforeById = {};  // id -> parsed card, from "Compare with before..." files or the generator's review data
+  let beforeLoaded = false;
+  let reviewMode = false; // true when the page was written by TU_Card_XML_Gen with its own data
 
   const TYPE_NAMES = { 1: "Imperial", 2: "Raider", 3: "Bloodthirsty", 4: "Xeno", 5: "Righteous", 6: "Progenitor" };
   const RARITY_NAMES = { 1: "Common", 2: "Rare", 3: "Epic", 4: "Legendary", 5: "Vindicator", 6: "Mythic" };
@@ -434,6 +488,7 @@
       sourceFile: sourceFile,
       closed: false,
       el: unitEl,
+      runStatus: unitEl.getAttribute("review-status"),   // "new" / "changed", set by TU_Card_XML_Gen
       directMatch: true,
       included: true
     };
@@ -446,10 +501,21 @@
     return { cardId: textOf(recipeEl, "card_id"), resources: resources, sourceFile: sourceFile };
   }
 
-  function parseXmlText(text, sourceFile) {
+  function parseXmlText(text, sourceFile, role) {
     const doc = new DOMParser().parseFromString(text, "text/xml");
     const perr = doc.querySelector("parsererror");
     if (perr) throw new Error("XML parse error in " + sourceFile);
+
+    if (role === "before") {
+      // Not shown - only used to compare with the loaded cards, by id.
+      let n = 0;
+      doc.querySelectorAll("unit").forEach(function (u) {
+        const c = parseUnit(u, sourceFile);
+        if (c.id) { beforeById[c.id] = c; n++; }
+      });
+      beforeLoaded = true;
+      return { addedCards: n, addedRecipes: 0 };
+    }
 
     const units = doc.querySelectorAll("unit");
     const foundRecipes = doc.querySelectorAll("fusion_recipe");
@@ -528,9 +594,35 @@
   const emptyState = document.getElementById("emptyState");
   const statusEl = document.getElementById("status");
 
+  // "new" (not in the before data), "changed", "same", or null when there's nothing to compare with.
+  function cardStatus(card) {
+    if (card.runStatus) return card.runStatus;
+    if (!beforeLoaded) return null;
+    const before = beforeById[card.id];
+    if (!before) return "new";
+    if (card._sig === undefined) card._sig = signature(card.el);
+    if (before._sig === undefined) before._sig = signature(before.el);
+    return card._sig === before._sig ? "same" : "changed";
+  }
+
+  function signature(el) {
+    return new XMLSerializer().serializeToString(el).replace(/>\s+</g, "><").replace(/\s+/g, " ").trim();
+  }
+
+  function passesViewFilters(card) {
+    if (chkWarnOnly.checked && !getValidationIssues(card).length) return false;
+    if (chkChangedOnly.checked) {
+      const st = cardStatus(card);
+      if (st !== "new" && st !== "changed") return false;
+    }
+    return true;
+  }
+
   function renderAll() {
+    hideTip();
     container.innerHTML = "";
-    const visibleCards = cards.filter(function (c) { return !c.closed && c.included; });
+    cards.forEach(function (c) { c._issues = null; });
+    const visibleCards = cards.filter(function (c) { return !c.closed && c.included && passesViewFilters(c); });
     emptyState.style.display = visibleCards.length ? "none" : "block";
 
     cardOrder = 0;
@@ -568,6 +660,9 @@
     const badges = document.createElement("span");
     if (card.fusionLevel) badges.appendChild(makeBadge("Fusion " + card.fusionLevel));
     if (card.baseCommanderId) badges.appendChild(makeBadge("base\u2192" + card.baseCommanderId));
+    const status = cardStatus(card);
+    if (status === "new") badges.appendChild(makeBadge("NEW")).classList.add("badge-new");
+    if (status === "changed") badges.appendChild(makeBadge("CHANGED")).classList.add("badge-changed");
     const issues = getValidationIssues(card);
     if (issues.length) badges.appendChild(makeWarningBadge(issues));
 
@@ -617,65 +712,337 @@
   }
 
   // ---------------------------------------------------------------------
-  // VALIDATION - extensible on purpose: each check below just pushes a
-  // short message onto `issues`. More checks (id/value sequencing, wrong
-  // set, summon errors) can be added here later without touching the UI
-  // that displays them.
+  // RULE CHECKS
+  // Each check adds { sev, msg, row, field, skillKey } to the card's list:
+  //   sev:   "warn" (worth a look) or "error" (almost certainly wrong)
+  //   row:   index into resolveLevels(card) (0 = level 1), or null for the whole card
+  //   field: "id", "attack", "health", "cost" or "skill" - where the triangle goes
+  // To add a check, push another issue in getValidationIssues; the badge,
+  // the triangles and the tooltips pick it up.
   // ---------------------------------------------------------------------
-  function getValidationIssues(card) {
-    const issues = [];
 
-    // Check: every fusion recipe resource should be the MAX-upgrade-level
-    // id of the card it refers to, not its base id or some other level.
+  // COMDEV's skill order (Skill_Order.xlsx / CardBuilder). Triggered skills sort at their trigger.
+  const SKILL_ORDER = {
+    flying: 0.5, evade: 1, revenge: 2, payback: 2, tribute: 3, absorb: 4, barrier: 5, stasis: 6, armored: 7, wall: 8,
+    allegiance: 9, avenge: 10, scavenge: 11, subdue: 12, counter: 14, corrosive: 15, poison: 16,
+    inhibit: 17, sabotage: 18, disease: 19, valor: 20, bravery: 20, summon: 21,
+    evolve: 22, enhance: 23, overload: 24, rush: 25, mend: 26, fortify: 26, heal: 27, protect: 28, entrap: 29, rally: 30,
+    enrage: 31, enfeeble: 32, strike: 33, jam: 34, weaken: 35, sunder: 35, besiege: 36, siege: 36, mimic: 37,
+    legion: 38, coalition: 39, venom: 40, pierce: 41, rupture: 41, hunt: 42, swipe: 43, drain: 43, leech: 44, berserk: 45, mark: 46,
+    flurry: 47, refresh: 48
+  };
+  const TRIGGER_POS = { play: 0, attacked: 13, death: 49 };
+  const EXCLUSIVE_PAIRS = [["payback", "revenge"], ["valor", "bravery"], ["mend", "fortify"], ["weaken", "sunder"]];
+  const FACTION_OK = ["mend", "fortify", "heal", "protect", "entrap", "rally", "enrage", "evolve", "enhance", "overload", "rush"];
+  const LABELS = { attack: "Attack", health: "HP" };
+
+  // TUO decides a card's kind from its id range.
+  function kindFromId(idText) {
+    const id = parseInt(idText, 10);
+    if (isNaN(id)) return null;
+    if (id < 1000) return "Assault";
+    if (id < 2000) return "Commander";
+    if (id < 3001) return "Structure";
+    if (id < 8000) return "Assault";
+    if (id < 10000) return "Structure";
+    if (id < 17000) return "Assault";
+    if (id < 25000) return "Structure";
+    if (id < 30000) return "Commander";
+    if (id < 50000) return "Assault";
+    if (id < 55001) return "Dominion";
+    return "Assault";
+  }
+
+  function num(v) {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  }
+
+  function skillKey(s) {
+    return [s.id, s.trigger || "", s.s || "", s.s2 || ""].join("|");
+  }
+
+  function skillLabel(s) {
+    return s.id + (s.s ? " " + s.s : "") + (s.trigger ? " (on " + s.trigger + ")" : "");
+  }
+
+  // Levels as the game sees them: an upgrade without <attack>/<health> keeps the previous value, and
+  // its skills replace the previous level's skills of the same kind (the rest carry over).
+  function effectiveLevels(card) {
+    const rows = resolveLevels(card);
+    let attack = null, health = null, skills = [];
+    return rows.map(function (r) {
+      if (r.attack !== null && r.attack !== undefined) attack = r.attack;
+      if (r.health !== null && r.health !== undefined) health = r.health;
+      if (r.skills) {
+        const merged = skills.slice();
+        r.skills.forEach(function (sk) {
+          const i = merged.findIndex(function (m) { return skillKey(m) === skillKey(sk); });
+          if (i >= 0) merged[i] = sk; else merged.push(sk);
+        });
+        skills = r.isBase ? r.skills.slice() : merged;
+      }
+      return { level: r.level, id: r.id, attack: attack, health: health, skills: skills, raw: r };
+    });
+  }
+
+  // Values that should never go down between levels (x, n, attack, health) or never go up (c).
+  // A single level that sticks out above both neighbours is reported as an outlier on that level.
+  function checkSeries(issues, values, label, field, key, rising) {
+    const pts = [];
+    values.forEach(function (v, row) { if (v !== null) pts.push({ v: v, row: row }); });
+    for (let i = 1; i < pts.length; i++) {
+      const prev = pts[i - 1], cur = pts[i];
+      const wrongWay = rising ? cur.v < prev.v : cur.v > prev.v;
+      if (!wrongWay) continue;
+      const beforePrev = i >= 2 ? pts[i - 2] : null;
+      const spike = beforePrev && (rising ? (prev.v > beforePrev.v && cur.v >= beforePrev.v) : (prev.v < beforePrev.v && cur.v <= beforePrev.v));
+      if (spike) {
+        issues.push({ sev: "warn", field: field, skillKey: key, row: prev.row,
+          msg: label + " at level " + (prev.row + 1) + " (" + prev.v + ") is out of line with levels " + (beforePrev.row + 1) + " and " + (cur.row + 1) +
+               " (" + beforePrev.v + ", " + cur.v + ") - a typo?" });
+        i++; // the next step is part of the same outlier
+      } else {
+        issues.push({ sev: "warn", field: field, skillKey: key, row: cur.row,
+          msg: label + (rising ? " drops" : " goes up") + " from " + prev.v + " (level " + (prev.row + 1) + ") to " + cur.v + " (level " + (cur.row + 1) + ")" +
+               (rising ? " - it should stay the same or rise with each level." : " - a cooldown should stay the same or fall with each level.") });
+      }
+    }
+  }
+
+  function getValidationIssues(card) {
+    if (card._issues) return card._issues;
+    const issues = [];
+    const levels = effectiveLevels(card);
+    const maxRow = levels.length - 1;
+    const kind = kindFromId(card.id);
+
+    // ---- skill count (only a heads-up: some cards have more or fewer) ----
+    const maxSkills = levels[maxRow].skills;
+    if (maxSkills.length !== 3) {
+      issues.push({ sev: "warn", row: null, field: null,
+        msg: "Has " + maxSkills.length + " skill" + (maxSkills.length === 1 ? "" : "s") + " at max level (most cards have 3)." });
+    }
+
+    // ---- ids and levels in sequence: each level's id is the previous level's + 1 ----
+    levels.forEach(function (lv, row) {
+      if (row === 0) return;
+      if (!lv.raw.id) {
+        issues.push({ sev: "error", row: row, field: "id", msg: "Level " + lv.level + " has no <card_id>." });
+        return;
+      }
+      if (String(row + 1) !== String(lv.level)) {
+        issues.push({ sev: "warn", row: row, field: "id", msg: "Upgrade " + row + " says level " + lv.level + " - expected level " + (row + 1) + "." });
+      }
+      const prevId = parseInt(levels[row - 1].raw.id, 10);
+      if (!isNaN(prevId) && parseInt(lv.raw.id, 10) !== prevId + 1) {
+        issues.push({ sev: "warn", row: row, field: "id",
+          msg: "Level " + (row + 1) + " id is " + lv.raw.id + ", not " + (prevId + 1) + " (level " + row + "'s id + 1). Ids normally run one per level, in a row" +
+               (row === 1 ? " - older cards often start their upgrades in another id range." : ".") });
+      }
+    });
+
+    // ---- attack and health only go up ----
+    ["attack", "health"].forEach(function (f) {
+      checkSeries(issues, levels.map(function (lv) { return num(lv[f]); }), LABELS[f], f, null, true);
+    });
+    if (num(levels[0].health) === null) {
+      issues.push({ sev: "error", row: 0, field: "health", msg: "No health at level 1." });
+    }
+
+    // ---- skill x / n only go up, c only goes down ----
+    const keys = [];
+    levels.forEach(function (lv) { lv.skills.forEach(function (sk) { const k = skillKey(sk); if (keys.indexOf(k) < 0) keys.push(k); }); });
+    keys.forEach(function (k) {
+      const per = levels.map(function (lv) { return lv.skills.find(function (sk) { return skillKey(sk) === k; }) || null; });
+      const any = per.find(Boolean);
+      const label = skillLabel(any);
+      checkSeries(issues, per.map(function (sk) { return sk ? num(sk.x) : null; }), label + " x", "skill", k, true);
+      checkSeries(issues, per.map(function (sk) { return sk && sk.all !== "1" ? num(sk.n) : null; }), label + " n", "skill", k, true);
+      checkSeries(issues, per.map(function (sk) { return sk ? num(sk.c) : null; }), label + " c", "skill", k, false);
+      // a level that restates its skills but leaves this one out
+      for (let row = 1; row < levels.length; row++) {
+        const raw = levels[row].raw.skills;
+        if (raw && per[row - 1] && !raw.some(function (sk) { return skillKey(sk) === k; })) {
+          issues.push({ sev: "warn", row: row, field: "skill", skillKey: null,
+            msg: "Level " + (row + 1) + " lists its skills but leaves out " + label + " (on level " + row + "). Restate every skill on every level." });
+          break;
+        }
+      }
+    });
+
+    // ---- per-level skill rules ----
+    const seen = {};
+    function once(issue) { if (!seen[issue.msg]) { seen[issue.msg] = true; issues.push(issue); } }
+    levels.forEach(function (lv, row) {
+      const raw = lv.raw.skills || [];
+      const ids = raw.map(function (sk) { return sk.id; });
+      raw.forEach(function (sk, i) {
+        const k = skillKey(sk);
+        if (raw.findIndex(function (o) { return skillKey(o) === k; }) !== i) {
+          once({ sev: "warn", row: row, field: "skill", skillKey: k, msg: skillLabel(sk) + " is listed twice on level " + (row + 1) + "." });
+        }
+        if (sk.y && FACTION_OK.indexOf(sk.id) < 0) {
+          once({ sev: "warn", row: row, field: "skill", skillKey: k, msg: sk.id + " has a faction (y=" + sk.y + "), but only " + FACTION_OK.join(", ") + " can carry one. The game ignores it." });
+        }
+        if (sk.all === "1" && sk.n !== undefined) {
+          once({ sev: "warn", row: row, field: "skill", skillKey: k, msg: sk.id + " has both all and n - use one or the other." });
+        }
+        if (sk.id === "summon" && !/^\d+$/.test(sk.card_id || "")) {
+          once({ sev: "error", row: row, field: "skill", skillKey: k, msg: "Summon has no real card id (card_id=\"" + (sk.card_id || "") + "\")." });
+        }
+        if (sk.id !== "summon" && sk.card_id !== undefined) {
+          once({ sev: "warn", row: row, field: "skill", skillKey: k, msg: sk.id + " has a card_id - only summon uses one." });
+        }
+      });
+      EXCLUSIVE_PAIRS.forEach(function (pair) {
+        if (ids.indexOf(pair[0]) >= 0 && ids.indexOf(pair[1]) >= 0) {
+          once({ sev: "warn", row: null, field: null, msg: pair[0] + " and " + pair[1] + " can't both be on one card." });
+        }
+      });
+    });
+
+    // ---- skill order (max level) ----
+    const orderKey = function (sk) { return sk.trigger && TRIGGER_POS[sk.trigger] !== undefined ? TRIGGER_POS[sk.trigger] : (SKILL_ORDER[sk.id] !== undefined ? SKILL_ORDER[sk.id] : 999); };
+    const shown = levels[maxRow].raw.skills || levels[maxRow].skills;
+    const sorted = shown.map(function (sk, i) { return { sk: sk, i: i }; })
+      .sort(function (a, b) { return orderKey(a.sk) - orderKey(b.sk) || a.i - b.i; }).map(function (o) { return o.sk; });
+    if (sorted.some(function (sk, i) { return sk !== shown[i]; })) {
+      issues.push({ sev: "warn", row: null, field: null,
+        msg: "Skills aren't in COMDEV's standard order. Expected: " + sorted.map(skillLabel).join(", ") + "." });
+    }
+
+    // ---- cost, and what the id range says the card is ----
+    if (card.cost !== null) {
+      const c = num(card.cost);
+      if (c === null || c < 0 || c > 4 || Math.floor(c) !== c) {
+        issues.push({ sev: "warn", row: 0, field: "cost", msg: "Cost is " + card.cost + " - cards normally cost 0 to 4." });
+      }
+    }
+    const hasAttack = levels.some(function (lv) { return lv.raw.attack !== null && lv.raw.attack !== undefined; });
+    if (kind === "Structure" && hasAttack) {
+      issues.push({ sev: "warn", row: 0, field: "attack", msg: "Id " + card.id + " is in a Structure range, but the card has an attack." });
+    }
+    if (kind === "Commander" && (hasAttack || card.cost !== null)) {
+      issues.push({ sev: "warn", row: 0, field: hasAttack ? "attack" : "cost", msg: "Id " + card.id + " is in a Commander range; commanders have no attack or cost." });
+    }
+    if (kind === "Assault" && card.attack === null) {
+      issues.push({ sev: "warn", row: 0, field: "attack", msg: "Id " + card.id + " is in an Assault range, but level 1 has no attack." });
+    }
+    if (!card.picture) {
+      issues.push({ sev: "warn", row: null, field: null, msg: "No picture." });
+    }
+
+    // ---- fusion recipes ----
     const inbound = recipes.filter(function (r) { return r.cardId === card.id; });
     inbound.forEach(function (recipe) {
       recipe.resources.forEach(function (res) {
         const target = cards.find(function (c) { return !c.closed && (c.id === res.cardId || findLevelId(c, res.cardId)); });
         if (!target) return; // not loaded - can't check, not itself an error
-        const levels = resolveLevels(target);
-        const maxId = levels[levels.length - 1].id;
+        const tLevels = effectiveLevels(target);
+        const maxId = tLevels[tLevels.length - 1].id;
         if (res.cardId !== maxId) {
           const howDescribed = res.cardId === target.id ? "the base id" : "an upgrade level, but not the max one";
-          issues.push('Fusion recipe resource "' + target.name + '" (' + res.cardId + ') is ' + howDescribed + ' - should be the max level, ' + maxId + ".");
+          issues.push({ sev: "warn", row: null, field: null,
+            msg: 'Fusion recipe resource "' + target.name + '" (' + res.cardId + ') is ' + howDescribed + " - should be the max level, " + maxId + "." });
+        }
+        // a 2x fusion: this card's level 1 shouldn't be weaker than the card it's fused from at max level
+        if (recipe.resources.length === 1 && res.number === "2" && target !== card) {
+          const top = tLevels[tLevels.length - 1];
+          ["attack", "health"].forEach(function (f) {
+            const a = num(top[f]), b = num(levels[0][f]);
+            if (a !== null && b !== null && b < a) {
+              issues.push({ sev: "warn", row: 0, field: f,
+                msg: LABELS[f] + " at level 1 (" + b + ") is lower than " + target.name + " at max level (" + a + "), the card it's fused from." });
+            }
+          });
         }
       });
     });
 
+    // ---- compared with before ----
+    const before = beforeById[card.id];
+    if (before) {
+      const bLevels = effectiveLevels(before);
+      if (bLevels.length > levels.length) {
+        issues.push({ sev: "error", row: null, field: null,
+          msg: "Had " + bLevels.length + " levels before, now " + levels.length + " - upgrade levels were lost." });
+      }
+      const nowKeys = levels[maxRow].skills.map(skillKey);
+      bLevels[bLevels.length - 1].skills.forEach(function (sk) {
+        if (nowKeys.indexOf(skillKey(sk)) < 0 && !levels[maxRow].skills.some(function (n) { return n.id === sk.id; })) {
+          issues.push({ sev: "warn", row: null, field: null,
+            msg: skillLabel(sk) + (sk.x !== undefined ? " " + sk.x : "") + " was on this card before and is gone now. Intended?" });
+        }
+      });
+      if (before.name !== card.name) {
+        issues.push({ sev: "warn", row: null, field: null, msg: 'Name changed from "' + before.name + '".' });
+      }
+    }
+
+    card._issues = issues;
     return issues;
   }
 
-  let activePopup = null;
-  function closeActivePopup() {
-    if (activePopup) { activePopup.remove(); activePopup = null; }
+  function worstSeverity(list) {
+    return list.some(function (i) { return i.sev === "error"; }) ? "error" : "warn";
   }
-  document.addEventListener("click", function (e) {
-    if (activePopup && !activePopup.contains(e.target) && !e.target.classList.contains("warn-badge")) closeActivePopup();
-  });
+
+  const TRIANGLE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 L23 21.5 H1 Z" fill="currentColor"/>' +
+    '<rect x="10.9" y="8.5" width="2.2" height="7" rx="1" fill="#fff"/><rect x="10.9" y="17.2" width="2.2" height="2.3" rx="1" fill="#fff"/></svg>';
+
+  // ---- hover tooltips ----
+  let tipEl = null;
+  function hideTip() { if (tipEl) { tipEl.remove(); tipEl = null; } }
+  function showTip(anchor, list) {
+    hideTip();
+    tipEl = document.createElement("div");
+    tipEl.className = "tip" + (worstSeverity(list) === "error" ? " sev-error" : "");
+    const ul = document.createElement("ul");
+    list.forEach(function (issue) {
+      const li = document.createElement("li");
+      if (issue.sev === "error") li.className = "sev-error";
+      li.innerHTML = TRIANGLE;
+      const span = document.createElement("span");
+      span.textContent = issue.msg;
+      li.appendChild(span);
+      ul.appendChild(li);
+    });
+    tipEl.appendChild(ul);
+    document.body.appendChild(tipEl);
+    const r = anchor.getBoundingClientRect();
+    const w = tipEl.offsetWidth;
+    const left = Math.max(8, Math.min(r.left, document.documentElement.clientWidth - w - 8));
+    tipEl.style.left = (left + window.scrollX) + "px";
+    tipEl.style.top = (r.bottom + window.scrollY + 5) + "px";
+  }
+
+  function makeIssueIcon(list, withCount) {
+    const el = document.createElement("span");
+    el.className = "issue-icon" + (worstSeverity(list) === "error" ? " sev-error" : "");
+    el.innerHTML = TRIANGLE + (withCount ? "<span>" + list.length + "</span>" : "");
+    el.setAttribute("aria-label", list.map(function (i) { return i.msg; }).join(" "));
+    el.tabIndex = 0;
+    el.addEventListener("mouseenter", function () { showTip(el, list); });
+    el.addEventListener("mouseleave", hideTip);
+    el.addEventListener("focus", function () { showTip(el, list); });
+    el.addEventListener("blur", hideTip);
+    return el;
+  }
 
   function makeWarningBadge(issues) {
-    const b = document.createElement("span");
-    b.className = "badge warn-badge";
-    b.textContent = "\u26A0 " + issues.length;
-    b.title = issues.join("\n");
-    b.addEventListener("click", function (e) {
-      e.stopPropagation();
-      if (activePopup) { closeActivePopup(); return; }
-      const popup = document.createElement("div");
-      popup.className = "warn-popup";
-      const list = document.createElement("ul");
-      issues.forEach(function (msg) {
-        const li = document.createElement("li");
-        li.textContent = msg;
-        list.appendChild(li);
-      });
-      popup.appendChild(list);
-      document.body.appendChild(popup);
-      const rect = b.getBoundingClientRect();
-      popup.style.left = (rect.left + window.scrollX) + "px";
-      popup.style.top = (rect.bottom + window.scrollY + 4) + "px";
-      activePopup = popup;
-    });
+    const b = makeIssueIcon(issues, true);
+    b.classList.add("card-issues");
+    if (worstSeverity(issues) === "error") b.classList.add("sev-error");
     return b;
+  }
+
+  // Puts a triangle in a table cell for the issues aimed at it.
+  function markCell(cell, list) {
+    if (!list.length) return;
+    cell.classList.add(worstSeverity(list) === "error" ? "has-error" : "has-warn");
+    cell.insertBefore(makeIssueIcon(list, false), cell.firstChild);
   }
 
   function buildStatTable(card) {
@@ -708,6 +1075,13 @@
 
     const tbody = document.createElement("tbody");
     const levels = resolveLevels(card);
+    const issues = getValidationIssues(card);
+    function cellIssues(row, field, key) {
+      return issues.filter(function (i) {
+        if (i.row !== row || i.field !== field) return false;
+        return field !== "skill" || key === undefined || !i.skillKey || i.skillKey === key;
+      });
+    }
     const baseColor = (cardOrder % 2 === 0) ? "var(--base-row-a)" : "var(--base-row-b)";
 
     function td(text, opts) {
@@ -734,15 +1108,33 @@
       tr1.appendChild(td(row.level, { rowspan: rowspanVal, num: true, narrow: true }));
       const idCell = td(row.id, { rowspan: rowspanVal, narrow: true });
       idCell.className += " row-id";
+      markCell(idCell, cellIssues(idx, "id"));
       tr1.appendChild(idCell);
-      tr1.appendChild(td(row.attack, { rowspan: rowspanVal, num: true, narrow: true }));
-      tr1.appendChild(td(row.health, { rowspan: rowspanVal, num: true, narrow: true }));
-      tr1.appendChild(td(card.cost, { rowspan: rowspanVal, num: true, narrow: true }));
+      const atkCell = td(row.attack, { rowspan: rowspanVal, num: true, narrow: true });
+      markCell(atkCell, cellIssues(idx, "attack"));
+      tr1.appendChild(atkCell);
+      const hpCell = td(row.health, { rowspan: rowspanVal, num: true, narrow: true });
+      markCell(hpCell, cellIssues(idx, "health"));
+      tr1.appendChild(hpCell);
+      const costCell = td(card.cost, { rowspan: rowspanVal, num: true, narrow: true });
+      markCell(costCell, cellIssues(idx, "cost"));
+      tr1.appendChild(costCell);
+
+      // skill issues aimed at a skill this level doesn't list itself go on its first skill cell
+      const rowSkillIssues = cellIssues(idx, "skill");
+      const unplaced = rowSkillIssues.filter(function (i) {
+        return !i.skillKey || !skills.some(function (sk) { return skillKey(sk) === i.skillKey; });
+      });
+      function skillCellIssues(i) {
+        const own = skills[i] ? rowSkillIssues.filter(function (x) { return x.skillKey && x.skillKey === skillKey(skills[i]); }) : [];
+        return i === 0 ? own.concat(unplaced) : own;
+      }
 
       for (let i = 0; i < 3; i++) {
         const cell = document.createElement("td");
         cell.className = "skill-cell" + (skills[i] ? "" : " empty-skill");
         cell.textContent = skills[i] ? formatSkill(skills[i]) : "\u2014";
+        markCell(cell, skillCellIssues(i));
         tr1.appendChild(cell);
       }
       tbody.appendChild(tr1);
@@ -763,6 +1155,7 @@
             text += "  |  +" + skills.slice(5).map(formatSkill).join(" | ");
           }
           cell.textContent = text;
+          markCell(cell, skillCellIssues(i));
           tr2.appendChild(cell);
         }
         tbody.appendChild(tr2);
@@ -821,6 +1214,8 @@
   const matchInfoEl = document.getElementById("matchInfo");
   const chkSummon = document.getElementById("chkSummon");
   const chkRecipes = document.getElementById("chkRecipes");
+  const chkWarnOnly = document.getElementById("chkWarnOnly");
+  const chkChangedOnly = document.getElementById("chkChangedOnly");
 
   function findCardByAnyId(id) {
     return cards.find(function (c) { return c.id === id || findLevelId(c, id); });
@@ -865,9 +1260,15 @@
     const shownCount = cards.filter(function (c) { return !c.closed && c.included; }).length;
     let text = "Matched " + directCount + " card" + (directCount === 1 ? "" : "s") + ".";
     if (shownCount > directCount) text += " (+" + (shownCount - directCount) + " related shown)";
-    matchInfoEl.innerHTML = text;
 
     renderAll();
+
+    const open = cards.filter(function (c) { return !c.closed && c.included; });
+    const warned = open.filter(function (c) { return getValidationIssues(c).length; }).length;
+    const filtered = open.length - open.filter(passesViewFilters).length;
+    text += " " + warned + " with \u26A0.";
+    if (filtered) text += " " + filtered + " hidden by the filters.";
+    matchInfoEl.textContent = text;
   }
 
   function runXPathFilter() {
@@ -918,6 +1319,14 @@
   });
   chkSummon.addEventListener("change", applyIncludedFlagsAndRender);
   chkRecipes.addEventListener("change", applyIncludedFlagsAndRender);
+  chkWarnOnly.addEventListener("change", applyIncludedFlagsAndRender);
+  chkChangedOnly.addEventListener("change", applyIncludedFlagsAndRender);
+
+  function enableChangedFilter() {
+    chkChangedOnly.disabled = false;
+    document.getElementById("lblChangedOnly").classList.remove("disabled");
+    document.getElementById("lblChangedOnly").title = "Show only cards that differ from the 'before' data (or are new)";
+  }
 
   // ---------------------------------------------------------------------
   // FUSION CONNECTOR OVERLAY (curved arrows between resource row -> target row)
@@ -984,10 +1393,41 @@
   const fileInput = document.getElementById("fileInput");
   document.getElementById("openBtn").addEventListener("click", function () { fileInput.click(); });
 
+  const beforeInput = document.getElementById("beforeInput");
+  document.getElementById("beforeBtn").addEventListener("click", function () { beforeInput.click(); });
+  beforeInput.addEventListener("change", function (e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    let remaining = files.length, total = 0;
+    const errors = [];
+    files.forEach(function (file) {
+      const reader = new FileReader();
+      reader.onload = function () {
+        try { total += parseXmlText(reader.result, file.name, "before").addedCards; }
+        catch (err) { errors.push(file.name + ": " + err.message); }
+        if (--remaining === 0) {
+          enableChangedFilter();
+          runXPathFilter();
+          let msg = "Comparing with " + Object.keys(beforeById).length + " card(s) from before.";
+          if (errors.length) msg += ' <span class="err">' + esc(errors.join("; ")) + "</span>";
+          statusEl.innerHTML = msg;
+        }
+      };
+      reader.readAsText(file);
+    });
+    beforeInput.value = "";
+  });
+
   document.getElementById("clearBtn").addEventListener("click", function () {
     cards = [];
     recipes = [];
     sourceDocs = [];
+    beforeById = {};
+    beforeLoaded = false;
+    chkChangedOnly.checked = false;
+    chkChangedOnly.disabled = true;
+    document.getElementById("lblChangedOnly").classList.add("disabled");
+    chkWarnOnly.checked = false;
     rowElementsById = {};
     xpathInput.value = "";
     chkSummon.checked = false;
@@ -1044,7 +1484,36 @@
     statusEl.innerHTML = msg;
   }
 
-  renderAll();
+  // A review page written by TU_Card_XML_Gen carries its own data:
+  //   <review title="..."><after>units</after><before>units</before><recipes>fusion_recipes</recipes></review>
+  function loadEmbeddedReview() {
+    const holder = document.getElementById("review-data");
+    if (!holder) return false;
+    const doc = new DOMParser().parseFromString(holder.textContent, "text/xml");
+    if (doc.querySelector("parsererror")) { statusEl.innerHTML = '<span class="err">The review data in this page could not be read.</span>'; return false; }
+    const review = doc.documentElement;
+    reviewMode = true;
+    review.querySelectorAll(":scope > before unit").forEach(function (u) {
+      const c = parseUnit(u, "before this run");
+      if (c.id) beforeById[c.id] = c;
+    });
+    beforeLoaded = Object.keys(beforeById).length > 0;
+    review.querySelectorAll(":scope > after unit").forEach(function (u) { cards.push(parseUnit(u, "this run")); });
+    review.querySelectorAll(":scope > recipes fusion_recipe").forEach(function (r) { recipes.push(parseRecipeEl(r, "fusion_recipes_cj2.xml")); });
+    sourceDocs.push({ doc: doc, fileName: "review" });
+    if (beforeLoaded) enableChangedFilter();
+
+    const title = review.getAttribute("title") || "Update review";
+    document.title = "Review: " + title;
+    document.getElementById("reviewTitle").textContent = "\u00b7 " + title;
+    runXPathFilter();
+    const nNew = cards.filter(function (c) { return c.runStatus === "new"; }).length;
+    const warned = cards.filter(function (c) { return getValidationIssues(c).length; }).length;
+    statusEl.innerHTML = esc((review.getAttribute("generated") || "") + ": " + (cards.length - nNew) + " changed, " + nNew + " new, " + warned + " with \u26A0.");
+    return true;
+  }
+
+  if (!loadEmbeddedReview()) renderAll();
 })();
 </script>
 

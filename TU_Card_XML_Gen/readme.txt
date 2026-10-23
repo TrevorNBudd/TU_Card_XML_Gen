@@ -1,4 +1,4 @@
-TU_Card_XML_Gen  (v1.7.0)
+TU_Card_XML_Gen  (v1.8.0)
 =========================
 
 Takes a plain-text "update file" and writes it into the Tyrant Unleashed card XMLs
@@ -46,6 +46,9 @@ Edit config.xml (it sits next to the exe):
     <SectionFile>          default cards_section_21.xml
     <Label>                default: update file name + month
 
+  <OpenReviewPage>    true (default) = open review.html in the browser after each
+                      run; false = only write it (see section 10)
+
   <MassNerfPoisonConfig><Factor>   default .4 (massnerfpoison only)
 
 Then run the exe.
@@ -64,7 +67,7 @@ new_cards_recipes.xml and new_cards_summary.txt. Those are handy for review and
 for pasting into the update you send to Kongregate.
 
 At the end the console lists any cards that failed to update, and any warnings.
-Read it.
+Read it. Then check the REVIEW PAGE that opens in your browser (section 10).
 
 
 -----------------------------------------------------------------------
@@ -473,6 +476,61 @@ SAFETY CHECKS (because the XMLs are changed in place)
 
 NOT SUPPORTED: mission cards (CardBuilder -UseMissionSet), real Commanders and
 Dominions, and finding pictures (use GetAvailablePictures.ps1).
+
+
+-----------------------------------------------------------------------
+10. REVIEW PAGE (review.html)
+-----------------------------------------------------------------------
+
+After every run the tool writes review.html into the output-<date-time> folder
+and opens it in your browser (turn that off with <OpenReviewPage>false). It is
+the Card XML Viewer showing only the cards this run CHANGED or CREATED, each
+compared with the same card from before the run.
+
+Any card that breaks a rule gets a warning triangle next to its name, and the
+cell at fault (a level's HP, a skill, the cost, an id) gets one too. Hover over a
+triangle to see why. Amber = worth a look, red = almost certainly wrong.
+
+What it checks:
+  - Skill count isn't 3 at max level (a heads-up only - some cards have more or
+    fewer).
+  - Level ids aren't one per level, in a row; levels out of order; a missing id.
+  - Attack, HP, or a skill's x or n DROPS between levels, or one level sticks out
+    (a big jump then a dip = probably a typo). A cooldown (c) going UP.
+  - Cost outside 0-4.
+  - Compared with before the run: a skill the card had is gone (this is what
+    catches a skill left out of the update file by mistake), or upgrade levels
+    were lost.
+  - A level that lists its skills but leaves one out.
+  - The same skill twice; Payback+Revenge, Valor+Bravery, Mend+Fortify or
+    Weaken+Sunder together; a faction on a skill that can't carry one; all and n
+    together; a Summon with no real card id.
+  - Skills not in COMDEV's standard order.
+  - The id range says Structure but the card has attack, or Commander but it
+    has attack or cost; no picture; no health at level 1.
+  - Fusion recipes: a resource that isn't the max-level id, and a 2x-fused card
+    whose level 1 is weaker than the max level of the card it's fused from.
+
+Filters at the top: "Only cards with warnings" and "Only changed cards".
+
+THE VIEWER ON ITS OWN
+CardXmlViewer.html (next to the exe) is the same page for any XML files:
+  1. Open XML File(s): e.g. a cards_section file after an update.
+  2. Compare with before...: the same file from before the update (e.g. a fresh
+     TUO download you kept). Changed cards get a CHANGED badge and lost skills or
+     levels are flagged; tick "Only changed cards" to see just those.
+This works for files changed by any tool, including older versions of this one.
+
+
+-----------------------------------------------------------------------
+CHANGES IN 1.8.0
+-----------------------------------------------------------------------
+
+  - Review page: review.html opens after every run with the changed and new cards,
+    their before versions and rule checks (section 10). <OpenReviewPage> turns the
+    automatic opening off.
+  - The Card XML Viewer is included as CardXmlViewer.html, with the same checks
+    and a "Compare with before..." button.
 
 
 -----------------------------------------------------------------------

@@ -74,6 +74,10 @@ namespace TU_Card_XML_Gen
             NewCardsSectionFile = newCards?.XPathSelectElement("SectionFile")?.Value.Trim() is { Length: > 0 } section ? section : "cards_section_21.xml";
             NewCardsLabel = newCards?.XPathSelectElement("Label")?.Value.Trim() is { Length: > 0 } label ? label : null;
 
+            // Optional: write review.html after each run (always) and open it in the browser (default true).
+            string? openReview = config.XPathSelectElement("OpenReviewPage")?.Value.Trim();
+            OpenReviewPage = string.IsNullOrEmpty(openReview) || !new[] { "false", "0", "no", "off" }.Contains(openReview.ToLowerInvariant());
+
             if (!int.TryParse(NewCardsSetId, out _))
             {
                 throw new Exception($"StandardOperationConfig/NewCards/SetId must be a number, not \"{NewCardsSetId}\".");
@@ -134,6 +138,9 @@ namespace TU_Card_XML_Gen
 
         /// <summary>Label written around the new cards and recipes; null = update file name + month.</summary>
         public string? NewCardsLabel { get; private set; }
+
+        /// <summary>Open review.html in the browser when a run finishes.</summary>
+        public bool OpenReviewPage { get; private set; } = true;
 
         public decimal MassNerfFactor;
         public UpdaterOperation Operation { get; private set; }

@@ -5,7 +5,7 @@ Takes a plain-text **update file** and writes it into the Tyrant Unleashed card 
 - **Buffs**: new stats and skills for *existing* cards, written into every fusion tier and every upgrade level, with stats scaled down automatically.
 - **New cards**: complete new cards (every level, ids, fusion recipes and pictures), built the same way as CardBuilder.ps1. See [New cards](#new-cards).
 
-Current version: **1.7.0**. Requires the .NET 8 runtime.
+Current version: **1.8.0**. Requires the .NET 8 runtime.
 
 - [Setup](#setup)
 - [Update file format](#update-file-format)
@@ -17,6 +17,8 @@ Current version: **1.7.0**. Requires the .NET 8 runtime.
 - [Mass nerf poison](#mass-nerf-poison)
 - [Gotchas](#gotchas)
 - [New cards](#new-cards)
+- [Review page](#review-page)
+- [Changes in 1.8.0](#changes-in-180)
 - [Changes in 1.7.0](#changes-in-170)
 - [Changes in 1.6.0](#changes-in-160)
 
@@ -32,13 +34,14 @@ Edit `config.xml` (it sits next to the exe), then run the exe.
 | `<AutoStats>` | `PercentAcrossTier` (default 15) and `PercentBetweenTiers` (default 5), used by autostats scaling. See [scaling](#how-scaling-works). |
 | `<Scaling>` | `<Mode>`: `autostats` (default) or `tiered`. `<Tiered>`: `FusionLevel0` (default `50..60`), `FusionLevel1` (`60..80`), `FusionLevel2` (`80..100`), `Summoned` (`50..100`). See [scaling](#how-scaling-works). |
 | `<NewCards>` | `SetId` (default `2500`), `SectionFile` (default `cards_section_21.xml`), `Label` (default: update file name + month). See [New cards](#new-cards). |
+| `<OpenReviewPage>` | `true` (default) opens `review.html` in the browser after each run; `false` only writes it. See [Review page](#review-page). |
 | `<MassNerfPoisonConfig><Factor>` | Default `.4` (massnerfpoison only). |
 
 > **The card XMLs are changed in place.** The tool overwrites the `cards_section_N.xml` files that contain a changed card, and new cards add to `fusion_recipes_cj2.xml`. If anything goes wrong, reset the XMLs by downloading them again in TUO.
 
 The tool also creates an `output-<date-time>` folder next to the exe with one small XML per updated or new card (`<card name>.xml`), plus `new_cards_recipes.xml` and `new_cards_summary.txt` for new cards. Handy for review and for the update you send to Kongregate.
 
-At the end the console lists any cards that **failed to update** and any **warnings**. Read it.
+At the end the console lists any cards that **failed to update** and any **warnings**. Read it, then check the [review page](#review-page) that opens in your browser.
 
 ## Update file format
 
@@ -350,6 +353,39 @@ Because the XMLs are changed in place:
 - A card that fails takes no ids, and the cards after it still build.
 
 Not supported: mission cards (CardBuilder `-UseMissionSet`), real Commanders and Dominions, and finding pictures (use `GetAvailablePictures.ps1`).
+
+## Review page
+
+After every run the tool writes `review.html` into the `output-<date-time>` folder and opens it in your browser (turn that off with `<OpenReviewPage>false</OpenReviewPage>`). It's the Card XML Viewer showing only the cards this run **changed** or **created**, each compared with the same card from before the run.
+
+A card that breaks a rule gets a ⚠ next to its name, and the cell at fault (a level's HP, a skill, the cost, an id) gets one too. **Hover over a ⚠ to see why.** Amber is worth a look; red is almost certainly wrong.
+
+| Check | Flags |
+|---|---|
+| Skill count | Not 3 skills at max level (a heads-up only: some cards have more or fewer) |
+| Ids and levels | Level ids not one per level in a row; levels out of order; a missing id |
+| Values by level | Attack, HP, or a skill's x or n **drops** between levels, or one level sticks out (a big jump then a dip); a cooldown (c) going **up** |
+| Cost | Outside 0–4 |
+| Compared with before the run | A skill the card had is gone (catches a skill left out of the update file by mistake); upgrade levels lost |
+| Skills | A level that lists its skills but leaves one out; the same skill twice; Payback+Revenge, Valor+Bravery, Mend+Fortify or Weaken+Sunder together; a faction on a skill that can't carry one; `all` and `n` together; a Summon with no real card id; skills not in COMDEV's standard order |
+| Card kind | Id range says Structure but the card has attack, or Commander but it has attack or cost; no picture; no health at level 1 |
+| Fusion recipes | A resource that isn't the max-level id; a 2x-fused card whose level 1 is weaker than the max level of the card it's fused from |
+
+Filters at the top: **Only cards with warnings** and **Only changed cards**.
+
+### The viewer on its own
+
+`CardXmlViewer.html` (next to the exe) is the same page for any XML files:
+
+1. **Open XML File(s)**: for example a `cards_section` file after an update.
+2. **Compare with before…**: the same file from before the update (for example a fresh TUO download you kept). Changed cards get a CHANGED badge, lost skills or levels are flagged, and **Only changed cards** shows just those.
+
+This works for files changed by any tool, including older versions of this one.
+
+## Changes in 1.8.0
+
+- **Review page**: `review.html` opens after every run with the changed and new cards, their before versions and rule checks. `<OpenReviewPage>` turns the automatic opening off.
+- The Card XML Viewer is included as `CardXmlViewer.html`, with the same checks and a **Compare with before…** button.
 
 ## Changes in 1.7.0
 

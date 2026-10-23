@@ -1,6 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <root>
 	<Operation>standard</Operation>
+	<!-- After every run, review.html (in the output folder) shows the changed and new cards with rule
+	     checks. true = open it in the browser automatically; false = just write it. -->
+	<OpenReviewPage>true</OpenReviewPage>
 	<!-- VALID OPERATIONS: 
 	<Operation>standard</Operation>
 	<Operation>massnerfpoison</Operation>

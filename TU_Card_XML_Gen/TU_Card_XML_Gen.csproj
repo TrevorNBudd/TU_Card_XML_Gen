@@ -14,6 +14,11 @@
     <None Update="readme.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <!-- The Card XML Viewer: built into the exe for the review page, and copied next to it to open by hand -->
+    <EmbeddedResource Include="Review\index.html" />
+    <None Include="Review\index.html" Link="CardXmlViewer.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
