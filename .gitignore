@@ -361,3 +361,16 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Output folders.
+output*/
+
+# Local runtime files and configuration.
+/TU_Card_XML_Gen.code-workspace
+/TU_Card_XML_Gen.deps.json
+/TU_Card_XML_Gen.dll
+/TU_Card_XML_Gen.exe
+/TU_Card_XML_Gen.runtimeconfig.json
+/config.xml
+/readme.txt
+/updatefile.txt
