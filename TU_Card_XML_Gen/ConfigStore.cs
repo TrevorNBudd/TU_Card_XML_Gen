@@ -78,6 +78,10 @@ namespace TU_Card_XML_Gen
             string? openReview = config.XPathSelectElement("OpenReviewPage")?.Value.Trim();
             OpenReviewPage = string.IsNullOrEmpty(openReview) || !new[] { "false", "0", "no", "off" }.Contains(openReview.ToLowerInvariant());
 
+            // Optional: put skills into COMDEV's standard order (default true).  "// REORDER:" in the update file overrides it.
+            string? reorder = config.XPathSelectElement("StandardOperationConfig/ReorderSkills")?.Value.Trim();
+            ReorderSkills = string.IsNullOrEmpty(reorder) || !new[] { "false", "0", "no", "off" }.Contains(reorder.ToLowerInvariant());
+
             if (!int.TryParse(NewCardsSetId, out _))
             {
                 throw new Exception($"StandardOperationConfig/NewCards/SetId must be a number, not \"{NewCardsSetId}\".");
@@ -141,6 +145,9 @@ namespace TU_Card_XML_Gen
 
         /// <summary>Open review.html in the browser when a run finishes.</summary>
         public bool OpenReviewPage { get; private set; } = true;
+
+        /// <summary>Put each card's skills into COMDEV's standard order, unless "// REORDER: FALSE" applies.</summary>
+        public bool ReorderSkills { get; private set; } = true;
 
         public decimal MassNerfFactor;
         public UpdaterOperation Operation { get; private set; }

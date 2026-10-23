@@ -903,15 +903,29 @@
       });
     });
 
-    // ---- skill order (max level) ----
+    // ---- skill order, on every level that lists its skills ----
+    // One message per wrong order found, saying which levels have it, what they have and what they should have.
     const orderKey = function (sk) { return sk.trigger && TRIGGER_POS[sk.trigger] !== undefined ? TRIGGER_POS[sk.trigger] : (SKILL_ORDER[sk.id] !== undefined ? SKILL_ORDER[sk.id] : 999); };
-    const shown = levels[maxRow].raw.skills || levels[maxRow].skills;
-    const sorted = shown.map(function (sk, i) { return { sk: sk, i: i }; })
-      .sort(function (a, b) { return orderKey(a.sk) - orderKey(b.sk) || a.i - b.i; }).map(function (o) { return o.sk; });
-    if (sorted.some(function (sk, i) { return sk !== shown[i]; })) {
-      issues.push({ sev: "warn", row: null, field: null,
-        msg: "Skills aren't in COMDEV's standard order. Expected: " + sorted.map(skillLabel).join(", ") + "." });
-    }
+    const wrongOrders = {};   // "has -> expected" -> [level numbers]
+    let firstWrongRow = null;
+    levels.forEach(function (lv, row) {
+      const shown = lv.raw.skills;
+      if (!shown || shown.length < 2) return;
+      const sorted = shown.map(function (sk, i) { return { sk: sk, i: i }; })
+        .sort(function (a, b) { return orderKey(a.sk) - orderKey(b.sk) || a.i - b.i; }).map(function (o) { return o.sk; });
+      if (sorted.some(function (sk, i) { return sk !== shown[i]; })) {
+        const k = shown.map(skillLabel).join(", ") + "|" + sorted.map(skillLabel).join(", ");
+        (wrongOrders[k] = wrongOrders[k] || []).push(row + 1);
+        if (firstWrongRow === null) firstWrongRow = row;
+      }
+    });
+    Object.keys(wrongOrders).forEach(function (k) {
+      const parts = k.split("|"), lvls = wrongOrders[k];
+      const where = lvls.length === levels.length ? (levels.length === 1 ? "" : " on every level")
+        : " on level" + (lvls.length === 1 ? " " : "s ") + lvls.join(", ");
+      issues.push({ sev: "warn", row: firstWrongRow, field: "skill", skillKey: null,
+        msg: "Skills aren't in COMDEV's standard order" + where + ": " + parts[0] + ". Should be: " + parts[1] + "." });
+    });
 
     // ---- cost, and what the id range says the card is ----
     if (card.cost !== null) {
@@ -969,13 +983,32 @@
         issues.push({ sev: "error", row: null, field: null,
           msg: "Had " + bLevels.length + " levels before, now " + levels.length + " - upgrade levels were lost." });
       }
-      const nowKeys = levels[maxRow].skills.map(skillKey);
-      bLevels[bLevels.length - 1].skills.forEach(function (sk) {
-        if (nowKeys.indexOf(skillKey(sk)) < 0 && !levels[maxRow].skills.some(function (n) { return n.id === sk.id; })) {
-          issues.push({ sev: "warn", row: null, field: null,
-            msg: skillLabel(sk) + (sk.x !== undefined ? " " + sk.x : "") + " was on this card before and is gone now. Intended?" });
-        }
+      // Skills that are gone, and what seems to have taken their place: a new skill in the same slot, or, when the
+      // number of skills didn't change, the new skills in turn.
+      const beforeSkills = bLevels[bLevels.length - 1].skills;
+      const nowSkills = levels[maxRow].skills;
+      const hadId = function (list, sk) { return list.some(function (o) { return o.id === sk.id && (o.s || "") === (sk.s || ""); }); };
+      const added = nowSkills.filter(function (sk) { return !hadId(beforeSkills, sk); });
+      const used = [];
+      const describe = function (sk) { return skillLabel(sk) + (sk.x !== undefined ? " " + sk.x : ""); };
+      beforeSkills.forEach(function (sk, j) {
+        if (hadId(nowSkills, sk)) return;
+        let by = null;
+        if (nowSkills[j] && added.indexOf(nowSkills[j]) >= 0 && used.indexOf(nowSkills[j]) < 0) by = nowSkills[j];
+        else if (beforeSkills.length === nowSkills.length) by = added.find(function (a) { return used.indexOf(a) < 0; }) || null;
+        if (by) used.push(by);
+        issues.push({ sev: "warn", row: null, field: null,
+          msg: describe(sk) + " was on this card before and is gone now" +
+               (by ? " - it looks like it was replaced by " + describe(by) + "." : " (nothing new took its place). Intended?") });
       });
+
+      // cost changed
+      if ((before.cost || "") !== (card.cost || "")) {
+        issues.push({ sev: "warn", row: 0, field: "cost",
+          msg: before.cost === null ? "Cost added: " + card.cost + " (there was none before)."
+             : card.cost === null ? "Cost removed (it was " + before.cost + ")."
+             : "Cost changed from " + before.cost + " to " + card.cost + "." });
+      }
       if (before.name !== card.name) {
         issues.push({ sev: "warn", row: null, field: null, msg: 'Name changed from "' + before.name + '".' });
       }

@@ -404,6 +404,22 @@ namespace TUComparatorLibrary
                         skillLines.Add(SkillLineTokenizer.Tokenize(updateCardLines[j], IsCardName));
                     }
 
+                    // COMDEV's standard skill order (CardBuilder's table).  On by default; "// REORDER: FALSE" keeps the typed order.
+                    List<SkillLine> standardOrder = TU_Card_XML_Gen.NewCards.NewCardSkills.InStandardOrder(skillLines, x => x.SkillId, x => x.Trigger);
+                    if (!standardOrder.SequenceEqual(skillLines))
+                    {
+                        string Order(IEnumerable<SkillLine> list) => string.Join(", ", list.Select(x => x.SkillId + (x.Trigger != null ? " (on " + x.Trigger + ")" : "")));
+                        if (updateCard.ReorderSkills ?? config.ReorderSkills)
+                        {
+                            Console.WriteLine($"  Skills reordered: {Order(skillLines)}  ->  {Order(standardOrder)}");
+                            skillLines = standardOrder;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"  Skills kept in the order typed (REORDER: FALSE): {Order(skillLines)}. COMDEV's standard order would be: {Order(standardOrder)}");
+                        }
+                    }
+
                     // Tiered scaling comes from a "// SCALE:" comment above this card, or from config.xml.  null = AutoStats.
                     TieredScaling? tiered = updateCard.Scaling ?? (config.ScalingMode == ConfigStore.ScalingModes.Tiered ? config.Tiered : null);
 

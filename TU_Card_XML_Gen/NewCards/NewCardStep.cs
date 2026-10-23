@@ -79,7 +79,7 @@ namespace TU_Card_XML_Gen.NewCards
             {
                 try
                 {
-                    specs.Add(NewCardParser.Parse(block, block.SetId ?? config.NewCardsSetId, isCardName, skillsSetIds));
+                    specs.Add(NewCardParser.Parse(block, block.SetId ?? config.NewCardsSetId, isCardName, skillsSetIds, config.ReorderSkills));
                 }
                 catch (FormatException ex)
                 {

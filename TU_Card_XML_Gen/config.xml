@@ -24,6 +24,13 @@
 	<PathToCardXMLs>C:\Users\purpl\OneDrive\Documents\TU_Test</PathToCardXMLs>
 	<StandardOperationConfig>
 		<PathToUpdateFile>data\updatefile.txt</PathToUpdateFile>
+		<!-- ReorderSkills: true = put every card's skills into COMDEV's standard order (the order CardBuilder uses:
+		     on-play skills first, then flying, evade, ... on-attacked skills after subdue, on-death skills last).
+		     false = keep the order typed in the update file (a note says what the standard order would be).
+		     The update file can change this for the cards that follow with
+		       // REORDER: TRUE    // REORDER: FALSE    // REORDER: AUTO  (back to this setting)
+		     REORDERSKILLS works too. -->
+		<ReorderSkills>true</ReorderSkills>
 		<AutoStats>
 			<!-- 
 		WHAT THESE MEAN:

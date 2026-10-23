@@ -289,17 +289,32 @@ namespace TU_Card_XML_Gen.NewCards
             return s;
         }
 
-        public static double SortKey(NewCardSkill s)
+        private static string Label(NewCardSkill s) => s.Id + (s.Trigger != null ? " (on " + s.Trigger + ")" : "");
+
+        public static double SortKey(NewCardSkill s) => SortKey(s.Id, s.Trigger);
+
+        /// <summary>Where a skill goes in COMDEV's standard order: by its trigger if it has one, else by its id.  Unknown = last.</summary>
+        public static double SortKey(string id, string? trigger)
         {
-            if (s.Trigger != null && TriggerPosition.TryGetValue(s.Trigger, out double t)) return t;
-            return SkillOrder.TryGetValue(s.Id, out double k) ? k : 999;
+            if (trigger != null && TriggerPosition.TryGetValue(trigger, out double t)) return t;
+            return SkillOrder.TryGetValue(id, out double k) ? k : 999;
+        }
+
+        /// <summary>items in standard order (a stable sort: skills with the same position keep their typed order).</summary>
+        public static List<T> InStandardOrder<T>(IList<T> items, Func<T, string> id, Func<T, string?> trigger)
+        {
+            return items.Select((s, i) => (Skill: s, Index: i))
+                .OrderBy(x => SortKey(id(x.Skill), trigger(x.Skill)))
+                .ThenBy(x => x.Index)
+                .Select(x => x.Skill)
+                .ToList();
         }
 
         /// <summary>
         /// CardBuilder's Confirm-AndSort-Skills: rejects exclusive pairs and repeated skills, and returns the
         /// skills in canonical order.  reorderedNote is set when the typed order was different.
         /// </summary>
-        public static List<NewCardSkill> ValidateAndSort(List<NewCardSkill> skills, out string? reorderedNote)
+        public static List<NewCardSkill> ValidateAndSort(List<NewCardSkill> skills, out string? reorderedNote, bool reorder = true)
         {
             reorderedNote = null;
 
@@ -318,19 +333,16 @@ namespace TU_Card_XML_Gen.NewCards
                 throw new FormatException($"skill \"{dupe}\" is listed more than once (check for a name/alias typo, e.g. Siege + Mortar are the same skill).");
             }
 
-            List<NewCardSkill> sorted = skills
-                .Select((s, i) => (Skill: s, Index: i))
-                .OrderBy(x => SortKey(x.Skill))
-                .ThenBy(x => x.Index)
-                .Select(x => x.Skill)
-                .ToList();
+            List<NewCardSkill> sorted = InStandardOrder(skills, x => x.Id, x => x.Trigger);
 
             if (!sorted.SequenceEqual(skills))
             {
-                reorderedNote = "skills reordered. Corrected order: " + string.Join(", ", sorted.Select(x => x.Id));
+                reorderedNote = reorder
+                    ? "skills reordered. Corrected order: " + string.Join(", ", sorted.Select(Label))
+                    : "skills kept in the order typed (REORDER: FALSE), but COMDEV's standard order would be: " + string.Join(", ", sorted.Select(Label));
             }
 
-            return sorted;
+            return reorder ? sorted : skills;
         }
     }
 }

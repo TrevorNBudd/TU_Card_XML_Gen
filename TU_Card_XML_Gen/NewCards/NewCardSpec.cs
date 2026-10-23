@@ -67,7 +67,7 @@ namespace TU_Card_XML_Gen.NewCards
 
         public static bool LooksLikeNewCard(IEnumerable<string> lines) => lines.Skip(1).Any(l => NewCardLine.IsMatch(l));
 
-        public static NewCardSpec Parse(UpdateBlock block, string defaultSetId, Func<string, bool> isCardName, ISet<string> skillsSetIds)
+        public static NewCardSpec Parse(UpdateBlock block, string defaultSetId, Func<string, bool> isCardName, ISet<string> skillsSetIds, bool reorderSkills = true)
         {
             List<string> lines = block.Lines;
             NewCardSpec spec = new NewCardSpec { StartLine = block.StartLine, SetId = defaultSetId };
@@ -258,7 +258,7 @@ namespace TU_Card_XML_Gen.NewCards
                 throw new FormatException("needs a Picture: line (new cards always need one - GetAvailablePictures.ps1 can suggest one).");
             }
 
-            spec.Skills = NewCardSkills.ValidateAndSort(spec.Skills, out string? note);
+            spec.Skills = NewCardSkills.ValidateAndSort(spec.Skills, out string? note, block.ReorderSkills ?? reorderSkills);
             if (note != null)
             {
                 spec.Notes.Add(note);

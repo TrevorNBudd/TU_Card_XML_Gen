@@ -24,6 +24,9 @@ namespace TU_Card_XML_Gen
         /// <summary>From "// NEW: TRUE" / "// BUFF: TRUE" comments above this card.  Auto = decide from the lines.</summary>
         public BlockKind Kind = BlockKind.Auto;
 
+        /// <summary>From "// REORDER: TRUE|FALSE" (or REORDERSKILLS) above this card.  null (or AUTO) = config.xml's ReorderSkills.</summary>
+        public bool? ReorderSkills;
+
         public string Name => Lines.Count > 0 ? Lines[0] : string.Empty;
     }
 
@@ -48,6 +51,8 @@ namespace TU_Card_XML_Gen
     ///  - "// SET: n" sets the set id of the new cards that follow (like CardBuilder's directive).
     ///  - "// NEW: TRUE" / "// BUFF: TRUE" (or NEW / BUFF on their own) make the cards that follow new
     ///    cards / buffs; "// NEW: AUTO" goes back to deciding from each card's lines.
+    ///  - "// REORDER: TRUE" / "FALSE" (or REORDERSKILLS) puts the skills of the cards that follow into
+    ///    COMDEV's standard order / keeps them as typed; "// REORDER: AUTO" goes back to config.xml's setting.
     /// Works with both Windows (CRLF) and Unix (LF) line endings.
     /// </summary>
     internal static class UpdateFileReader
@@ -55,6 +60,7 @@ namespace TU_Card_XML_Gen
         private static readonly Regex SummonSeparator = new Regex(@"^-{3,}$");
         private static readonly Regex ScaleDirective = new Regex(@"^\s*scale\s*:(.*)$", RegexOptions.IgnoreCase);
         private static readonly Regex SetDirective = new Regex(@"^\s*set\s*:\s*(?<set>\d+)\s*$", RegexOptions.IgnoreCase);
+        private static readonly Regex ReorderDirective = new Regex(@"^\s*\[?\s*reorder(?:skills)?\s*(?::\s*\[?\s*(?<value>true|false|auto)\s*\]?)?\s*\]?\s*$", RegexOptions.IgnoreCase);
         private static readonly Regex KindDirective = new Regex(@"^\s*\[?\s*(?<kind>new|buff)\s*(?::\s*(?<value>true|false|auto))?\s*\]?\s*$", RegexOptions.IgnoreCase);
 
         public static List<UpdateBlock> Read(string path, TieredScaling configTiered)
@@ -70,6 +76,7 @@ namespace TU_Card_XML_Gen
             TieredScaling? currentScaling = null;
             string? currentSet = null;
             BlockKind currentKind = BlockKind.Auto;
+            bool? currentReorder = null;
             int lineNumber = 0;
 
             foreach (string rawLine in rawLines)
@@ -100,6 +107,15 @@ namespace TU_Card_XML_Gen
 
                         Console.WriteLine($"Line {lineNumber}: the cards that follow are "
                             + (currentKind == BlockKind.Auto ? "detected automatically (new cards have a Picture: line)" : currentKind == BlockKind.New ? "new cards" : "buffs") + ".");
+                    }
+
+                    Match reorderDirective = ReorderDirective.Match(commentText);
+                    if (reorderDirective.Success)
+                    {
+                        string value = reorderDirective.Groups["value"].Success ? reorderDirective.Groups["value"].Value.ToLowerInvariant() : "true";
+                        currentReorder = value == "auto" ? null : value == "true";
+                        Console.WriteLine($"Line {lineNumber}: skills of the cards that follow are "
+                            + (currentReorder == null ? "reordered or not as config.xml's ReorderSkills says" : currentReorder.Value ? "put into COMDEV's standard order" : "kept in the order typed") + ".");
                     }
 
                     Match directive = ScaleDirective.Match(commentText);
@@ -147,7 +163,8 @@ namespace TU_Card_XML_Gen
                         SummonedByPrevious = gapHasSummonSeparator,
                         Scaling = currentScaling,
                         SetId = currentSet,
-                        Kind = currentKind
+                        Kind = currentKind,
+                        ReorderSkills = currentReorder
                     };
                     blocks.Add(current);
                     gapHasSummonSeparator = false;

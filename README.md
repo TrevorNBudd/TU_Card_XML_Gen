@@ -14,6 +14,7 @@ Current version: **1.8.0**. Requires the .NET 8 runtime.
 - [Triggers](#triggers)
 - [Shortcuts](#shortcuts)
 - [How scaling works](#how-scaling-works)
+- [Skill order](#skill-order)
 - [Mass nerf poison](#mass-nerf-poison)
 - [Gotchas](#gotchas)
 - [New cards](#new-cards)
@@ -53,6 +54,7 @@ The folders are made for you. Their names and places are set under `<Folders>`; 
 | `<Folders>` | `Data` (`data`), `Results` (`results`), `Logs` (`logs`), `CleanupMonths` (`3`). See [Folders](#folders). |
 | `<AutoStats>` | `PercentAcrossTier` (default 15) and `PercentBetweenTiers` (default 5), used by autostats scaling. See [scaling](#how-scaling-works). |
 | `<Scaling>` | `<Mode>`: `autostats` (default) or `tiered`. `<Tiered>`: `FusionLevel0` (default `50..60`), `FusionLevel1` (`60..80`), `FusionLevel2` (`80..100`), `Summoned` (`50..100`). See [scaling](#how-scaling-works). |
+| `<ReorderSkills>` | `true` (default) puts every card's skills into COMDEV's standard order; `false` keeps the order you typed. See [Skill order](#skill-order). |
 | `<NewCards>` | `SetId` (default `2500`), `SectionFile` (default `cards_section_21.xml`), `Label` (default: update file name + month). See [New cards](#new-cards). |
 | `<OpenReviewPage>` | `true` (default) opens `review.html` in the browser after each run; `false` only writes it. See [Review page](#review-page). |
 | `<MassNerfPoisonConfig><Factor>` | Default `.4` (massnerfpoison only). |
@@ -110,7 +112,7 @@ These are the **max** stats. See [scaling](#how-scaling-works) for how lower lev
 ### Skills (line 4+)
 
 - The skills you list **replace all existing skills** on the card, on every tier and level. List every skill the card should have, not just the changed ones.
-- Skills are written to the XML in the order you list them.
+- Skills are put into COMDEV's standard order for you (see [Skill order](#skill-order)); the console shows the change.
 - Values are the max values. Lower levels and tiers scale down.
 - **Nothing is case-sensitive**: skill names, `all`, `every`, factions and triggers can be written in any case (`RALLY ALL rt 100 On Attacked` is fine).
 - A word the tool doesn't recognise (e.g. a misspelt skill) makes that card **fail** with a message naming the word, rather than writing bad XML.
@@ -281,6 +283,24 @@ A comment starting with `SCALE:` changes the scaling for every card that starts 
 
 A SCALE comment the tool can't read stops the whole run **before anything is changed**, and says which line is wrong.
 
+## Skill order
+
+Every card's skills (buffs and new cards) are written in COMDEV's standard order, the one CardBuilder uses: on-play skills first, then flying, evade, revenge/payback, tribute, absorb, barrier, stasis, armored, wall, allegiance, avenge, scavenge, subdue, on-attacked skills, counter, corrosive, poison, inhibit, sabotage, disease, bravery/valor, summon, evolve, enhance, overload, rush, fortify/mend, heal, protect, entrap, rally, enrage, enfeeble, strike, jam, sunder/weaken, besiege, mimic, legion, coalition, venom, pierce, hunt, drain, leech, berserk, mark, flurry, refresh, and on-death skills last. Skills the table doesn't know go at the end. When the order changes, the console says so:
+
+```
+  Skills reordered: stasis, legion, enrage (on attacked)  ->  stasis, enrage (on attacked), legion
+```
+
+To keep the order you typed for some cards, put a directive above them. It applies to every card after it, until the next one:
+
+| Comment | Cards below it |
+|---|---|
+| `// REORDER: TRUE` | skills put into standard order |
+| `// REORDER: FALSE` | skills kept in the order typed (the console still says what the standard order would be) |
+| `// REORDER: AUTO` | back to `<ReorderSkills>` in config.xml (default: reorder) |
+
+`REORDERSKILLS` works the same as `REORDER`, `// REORDER` on its own means `TRUE`, and brackets are allowed (`// [REORDER: FALSE]`).
+
 ## Mass nerf poison
 
 Set `<Operation>massnerfpoison</Operation>`. Every card whose max level has Poison gets Poison multiplied by `<Factor>` on every level, rounded **up**. The update file isn't used. The XMLs are changed in place, as above.
@@ -353,7 +373,7 @@ Mostly the same as [buffs](#skill-syntax), with CardBuilder's rules:
 - `Enhance [n | all] <skill> <value>`, `Overload [n | all] [faction]`, `Evolve [n] <skill> [to] <skill>` (no `all` on new cards).
 - `Summon <card name>`: a card in this file or an existing card. Level N of a single card summons level N; over a chain the summoned card's levels are spread evenly.
 - `Wall`, `Flying`: no value. Triggers can be written as for [buffs](#triggers).
-- Skills are put in COMDEV's standard order for you (the console says so).
+- Skills are put in COMDEV's standard order for you (the console says so), unless `// REORDER: FALSE` applies. See [Skill order](#skill-order).
 - A card is **not** built if it has a skill twice (Siege + Mortar count), or both of Payback/Revenge, Valor/Bravery, Mend/Fortify or Weaken/Sunder.
 
 ### Ids, recipes and pictures
@@ -387,8 +407,8 @@ A card that breaks a rule gets a ⚠ next to its name, and the cell at fault (a 
 | Ids and levels | Level ids not one per level in a row; levels out of order; a missing id |
 | Values by level | Attack, HP, or a skill's x or n **drops** between levels, or one level sticks out (a big jump then a dip); a cooldown (c) going **up** |
 | Cost | Outside 0–4 |
-| Compared with before the run | A skill the card had is gone (catches a skill left out of the update file by mistake); upgrade levels lost |
-| Skills | A level that lists its skills but leaves one out; the same skill twice; Payback+Revenge, Valor+Bravery, Mend+Fortify or Weaken+Sunder together; a faction on a skill that can't carry one; `all` and `n` together; a Summon with no real card id; skills not in COMDEV's standard order |
+| Compared with before the run | A skill the card had is gone, and which new skill seems to have replaced it (same slot, or the next new skill when the number of skills didn't change), or *nothing new took its place* (catches a skill left out of the update file by mistake); cost changed (from and to); upgrade levels lost; name changed |
+| Skills | A level that lists its skills but leaves one out; the same skill twice; Payback+Revenge, Valor+Bravery, Mend+Fortify or Weaken+Sunder together; a faction on a skill that can't carry one; `all` and `n` together; a Summon with no real card id; skills not in COMDEV's standard order on any level (with the order they should be in) |
 | Card kind | Id range says Structure but the card has attack, or Commander but it has attack or cost; no picture; no health at level 1 |
 | Fusion recipes | A resource that isn't the max-level id; a 2x-fused card whose level 1 is weaker than the max level of the card it's fused from |
 
@@ -410,6 +430,8 @@ This works for files changed by any tool, including older versions of this one.
 - **Tiered scaling fix**: each card uses the range for its own fusion level (from the top card's `<fusion_level>`), so lone Fusion 2 cards (e.g. Revenant) get 80–100 instead of 50–60, and Base Fusion pairs (e.g. Stag Beetle → Forsaken Beetle) get 60–80 / 80–100. Four-stage commanders leave their first stage unchanged unless four ranges are given.
 - Standard folders under the main folder: `data` (update files), `results` (one folder per run) and `logs` (one log per day, runs appended). Set in `<Folders>`.
 - **Cleanup**: data, results and logs older than `<CleanupMonths>` (3) months are deleted at the start of each run.
+- **Skill order**: skills are put into COMDEV's standard order on buffs too (new cards already were). `<ReorderSkills>` and `// REORDER: TRUE | FALSE | AUTO` (or `REORDERSKILLS`) control it.
+- Review checks: a gone skill says what replaced it, cost changes show from and to, and the skill-order check covers every level and says what the order should be.
 - `config.xml` is found in the current folder or next to the exe; relative paths in it start at its folder. "Press any key" no longer crashes when the input is redirected.
 
 ## Changes in 1.7.0
